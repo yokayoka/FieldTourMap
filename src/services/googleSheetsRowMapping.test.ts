@@ -6,7 +6,7 @@ import {
   extractTourFromSheets,
   type SheetsData,
 } from "./googleSheetsRowMapping";
-import type { LayerDefinition, TourConfig } from "../../../src/types/config";
+import type { LayerDefinition, TourConfig } from "../types/config";
 
 const layers: LayerDefinition[] = [
   {

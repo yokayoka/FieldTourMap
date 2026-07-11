@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { GoogleSheetsProjectService } from "./googleSheetsProjectService";
-import { layersToSheet } from "./googleSheetsRowMapping";
+import { layersToSheet } from "../../../src/services/googleSheetsRowMapping";
 import type { LayerDefinition, TourConfig } from "../../../src/types/config";
 
 const layers: LayerDefinition[] = [

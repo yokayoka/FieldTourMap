@@ -277,9 +277,12 @@ Phase 4完了後、ユーザーからの追加要望によりRequirement 15（Go
 
 Task 25完了後、ユーザーとの議論により「GitHubを使わない第三者主催者が本アプリを流用できるようにしたい」という、当初のRequirement 15の想定より大きな目的が判明した。これに対応するためRequirement 16（参加者向けMap Viewerでの、認証なし公開CSV経由のプロジェクト読み込み）を追加し、以下の通りタスクを再編した。
 
-- [ ] 26. 🔴 GoogleSheetsRowMappingの共有化とCSVパーサーの実装（TDD）
+- [x] 26. ✅️ GoogleSheetsRowMappingの共有化とCSVパーサーの実装（TDD）
   - `admin-tool/src/services/googleSheetsRowMapping.ts`を`src/services/`へ移動し、`ConfigValidator`同様Admin Tool/Map Viewer双方から利用する共有モジュールとする（Admin Tool側のimportパス・既存テストへの影響を確認）
   - RFC 4180準拠の小さなCSVパーサー/シリアライザを新規実装（引用符・カンマ・改行を含むフィールドの往復一致をTDDで確認）。新規npm依存は追加しない
+  - 完了メモ: `googleSheetsRowMapping.ts`/`.test.ts`を`src/services/`へ移動し、`admin-tool`側の`googleSheetsProjectService.ts`・そのテストのimportパスを更新。移動前後で既存23テストが引き続き成功することを確認した。`src/utils/csv.ts`にRFC 4180準拠のCSVパーサー（`parseCsv`）を状態機械で新規実装（引用符内のカンマ・改行・二重引用符エスケープ、CRLF/LF混在、末尾改行の扱い、空フィールドを含め9テスト）。実際にSheetsへ書き込む処理（Admin Tool側）はJSON `values`形式のみを使うため、CSVシリアライザは実装せず`parseCsv`のみとした（YAGNI）
+  - `npm run build`後の参加者向けバンドルサイズが変化しないことを確認（`googleSheetsRowMapping.ts`はまだどこからも参照されていないため。Task 27でMap Viewer側から実際に利用する）
+  - 単体テスト310件→319件（+9）、E2Eテスト44件（影響なし）、lint・型チェック・buildすべて成功
   - _Requirements: 15, 16_
 
 - [ ] 27. 🔴 PublicSheetProjectLoaderの実装（TDD）

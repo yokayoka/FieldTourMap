@@ -6,7 +6,7 @@ import {
   mergeTourIntoSheets,
   sheetToLayers,
   type SheetsData,
-} from "./googleSheetsRowMapping";
+} from "../../../src/services/googleSheetsRowMapping";
 
 export interface TokenClientLike {
   requestAccessToken(): void;

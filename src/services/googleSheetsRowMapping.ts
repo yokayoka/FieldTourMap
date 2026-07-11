@@ -5,7 +5,7 @@ import type {
   PointOfInterest,
   RoutePath,
   TourConfig,
-} from "../../../src/types/config";
+} from "../types/config";
 
 export interface SheetsData {
   Layers?: string[][];
