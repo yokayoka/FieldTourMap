@@ -22,12 +22,20 @@ export interface LayerManagerOptions {
 const DEFAULT_STORAGE_KEY = "fieldtour.layerState.v1";
 
 function defaultCreateLayer(definition: LayerDefinition): L.Layer {
-  return L.tileLayer(definition.urlTemplate, {
+  const layer = L.tileLayer(definition.urlTemplate, {
     attribution: definition.attribution,
     opacity: definition.opacity,
     minZoom: definition.minZoom,
     maxZoom: definition.maxZoom,
   });
+
+  // オフライン等でタイル取得に失敗した場合、個別タイルをグレーアウト
+  // 表示にとどめ、アプリ全体はクラッシュさせない（Requirement 3.3）。
+  layer.on("tileerror", (event: L.TileErrorEvent) => {
+    event.tile.classList.add("tile-error");
+  });
+
+  return layer;
 }
 
 export class LayerManager {

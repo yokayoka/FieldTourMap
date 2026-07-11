@@ -98,9 +98,12 @@ Phase 1完了後、8観点（正誤性3・再利用/簡素化/効率3・altitude
 
 ## Phase 2: 機能拡張
 
-- [ ] 10. 🔴 Service Workerによるオフラインタイルキャッシュの実装
+- [x] 10. ✅️ Service Workerによるオフラインタイルキャッシュの実装
   - OfflineCacheServiceのテスト作成→実装（閲覧済みタイル・アプリアセットのキャッシュ）
   - オフライン時の未キャッシュタイルに対するグレーアウト代替表示、アプリ非クラッシュの確認
+  - 完了メモ: `OfflineCacheService`（register/isTileCached）をDIパターンでTDD実装（6テスト）。`public/sw.js`は地図タイル配信元（GSI/産総研/OSM）へのGETリクエストのみをcache-first-with-network-fallbackで処理する手書きService Workerとし、スコープをタイルに限定（アプリ本体のapp-shellキャッシュはTask 19のPWA対応で扱う）。`LayerManager.defaultCreateLayer`に`tileerror`ハンドラを追加し`.tile-error`クラスでグレーアウト表示するCSSを追加
+  - 重大なバグを発見・修正: E2Eテストで実際にキャッシュへ何も格納されないことが判明。`<img>`タグ経由のクロスオリジンタイルリクエストはno-corsとなりレスポンスが`opaque`（`status:0, ok:false`）になるため、`if (response.ok)`のみのキャッシュ条件では地図タイルが一切キャッシュされない不具合があった。`response.type === "opaque"`も許可するよう修正し、E2Eテストで実際にキャッシュへ格納されることを確認した。単体テストでは検出できない、実ブラウザでのService Worker検証だからこそ見つかった不具合
+  - Playwrightで確認: SW登録・活性化、タイルキャッシュへの格納（Cache API直接検査）、オフライン時の未キャッシュタイルへのグレーアウト表示適用とアプリ非クラッシュ
   - _Requirements: 3_
 
 - [ ] 11. 🔴 想定エリアの一括プリキャッシュ機能

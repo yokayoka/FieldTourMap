@@ -10,6 +10,12 @@ body,
   height: 100%;
 }
 
+/* オフライン等でタイル取得に失敗した場合の代替表示（Requirement 3.3） */
+.tile-error {
+  background-color: #ccc;
+  opacity: 0.6 !important;
+}
+
 /* 設定読み込み等の致命的な失敗時、真っ白な画面の代わりに表示する通知 */
 .app-error-banner {
   position: fixed;

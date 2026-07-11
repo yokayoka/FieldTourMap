@@ -8,6 +8,7 @@ import { GeolocationService, type GeolocationUpdate } from "./services/geolocati
 import { createLocationControl } from "./components/locationControl";
 import { PoiRouteOverlay } from "./services/poiRouteOverlay";
 import { createPoiDetailPanel } from "./components/poiDetailPanel";
+import { OfflineCacheService } from "./services/offlineCacheService";
 
 // 初期表示位置は現在地取得（Requirement 1）が成功するまでの暫定フォールバック。
 const DEFAULT_CENTER: L.LatLngExpression = [35.681236, 139.767125];
@@ -118,6 +119,9 @@ async function setupPoiOverlay(map: L.Map, root: HTMLElement): Promise<void> {
 }
 
 export async function initializeMap(root: HTMLElement, mapContainer: HTMLElement): Promise<void> {
+  // タイルキャッシュの登録は地図表示をブロックしない（Requirement 3）。
+  void new OfflineCacheService({ swUrl: `${import.meta.env.BASE_URL}sw.js` }).register();
+
   const map = L.map(mapContainer).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
   // 現在地ボタンとレイヤーパネルは同じ画面下部の親指可動域にまとめる
