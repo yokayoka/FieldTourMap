@@ -114,10 +114,13 @@ Phase 1完了後、8観点（正誤性3・再利用/簡素化/効率3・altitude
   - Playwrightで確認: ボタン押下→進捗表示→完了表示（ボタン再有効化）、Cache API検証でプリキャッシュ後にタイル数が実際に増加することを確認
   - _Requirements: 3_
 
-- [ ] 12. 🔴 観察メモ機能の実装
+- [x] 12. ✅️ 観察メモ機能の実装
   - `ObservationMemoStore`（localStorage/IndexedDB）のCRUDテスト作成→実装
   - 地図上へのメモピン表示、タップでの内容確認UI
   - CSV/GeoJSONエクスポート機能のテスト作成→実装
+  - 完了メモ: `ObservationMemoStore`をDIパターン（storage/generateId/now）でTDD実装（CRUD 7テスト+エクスポート5テスト）。CSVはRFC 4180準拠でtext列を常にクォート、GeoJSONはFeatureCollection/Point（[lng,lat]順）で出力。`memoPanel`（作成/編集/閲覧を1コンポーネントに統合、10テスト）と`memoControl`（配置モードトグル+CSV/GeoJSONエクスポートボタン、5テスト）をDOM純粋コンポーネントとして実装。地図タップで配置するモードとPOIとは別の琥珀色ピンでmain.tsに統合
+  - 発見した不具合: 機能追加でbottom-controls（現在地・レイヤー・プリキャッシュ・メモの4機能を積み上げ）の高さが画面の6割近くに達し、地図中央のタップがコントロールに奪われる状態になっていた。E2Eテストで発覚し、`.bottom-controls`に`max-height: 40vh; overflow-y: auto;`を追加して地図の可視領域を確保するよう修正。今後さらに機能が増える場合は、コントロールのグルーピング再設計を検討する必要がある
+  - Playwrightで確認: 地図タップ→メモ作成→ピン表示→タップで内容確認→編集→削除、リロード後の永続化、CSV/GeoJSONダウンロード（ファイル名検証）
   - _Requirements: 5_
 
 - [ ] 13. 🔴 Admin Config Tool: レイヤー編集機能

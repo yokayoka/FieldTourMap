@@ -10,7 +10,10 @@ import { PoiRouteOverlay } from "./services/poiRouteOverlay";
 import { createPoiDetailPanel } from "./components/poiDetailPanel";
 import { OfflineCacheService } from "./services/offlineCacheService";
 import { createPrecacheControl } from "./components/precacheControl";
-import type { LayerDefinition } from "./types/config";
+import { ObservationMemoStore } from "./services/observationMemoStore";
+import { createMemoPanel } from "./components/memoPanel";
+import { createMemoControl } from "./components/memoControl";
+import type { LayerDefinition, ObservationMemo } from "./types/config";
 
 // 初期表示位置は現在地取得（Requirement 1）が成功するまでの暫定フォールバック。
 const DEFAULT_CENTER: L.LatLngExpression = [35.681236, 139.767125];
@@ -158,6 +161,87 @@ function setupPrecacheControl(
   }
 }
 
+function createMemoIcon(): L.DivIcon {
+  return L.divIcon({
+    className: "memo-marker",
+    html: `<div class="memo-marker__dot"></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
+}
+
+function downloadTextFile(filename: string, content: string, mimeType: string): void {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function setupObservationMemos(map: L.Map, root: HTMLElement, bottomControls: HTMLElement): void {
+  const store = new ObservationMemoStore();
+  let memoMarkers: L.Marker[] = [];
+  let placementActive = false;
+
+  const memoPanel = createMemoPanel({
+    onSaveNew: (text, position) => {
+      if (text.trim() !== "") {
+        store.add({ position, text });
+        renderMemoMarkers();
+      }
+      memoPanel.hide();
+    },
+    onSaveEdit: (id, text) => {
+      store.update(id, text);
+      renderMemoMarkers();
+      memoPanel.hide();
+    },
+    onDelete: (id) => {
+      store.delete(id);
+      renderMemoMarkers();
+      memoPanel.hide();
+    },
+    onClose: () => memoPanel.hide(),
+  });
+  root.appendChild(memoPanel.root);
+
+  function renderMemoMarkers(): void {
+    memoMarkers.forEach((marker) => map.removeLayer(marker));
+    memoMarkers = store.list().map((memo: ObservationMemo) => {
+      const marker = L.marker([memo.position.lat, memo.position.lng], { icon: createMemoIcon() });
+      marker.on("click", () => memoPanel.showMemo(memo));
+      marker.addTo(map);
+      return marker;
+    });
+  }
+  renderMemoMarkers();
+
+  const memoControl = createMemoControl({
+    onTogglePlacement: (active) => {
+      placementActive = active;
+    },
+    onExportCsv: () => downloadTextFile("observation-memos.csv", store.exportAsCsv(), "text/csv"),
+    onExportGeoJson: () =>
+      downloadTextFile(
+        "observation-memos.geojson",
+        store.exportAsGeoJson(),
+        "application/geo+json",
+      ),
+  });
+  bottomControls.appendChild(memoControl.root);
+
+  // メモ配置モード中に地図（POI/メモマーカー以外）をタップした地点に
+  // メモ作成フォームを開く（Requirement 5.1）。
+  map.on("click", (event: L.LeafletMouseEvent) => {
+    if (!placementActive) return;
+    placementActive = false;
+    memoControl.setPlacementActive(false);
+    memoPanel.showCreateForm({ lat: event.latlng.lat, lng: event.latlng.lng });
+  });
+}
+
 async function setupPoiOverlay(map: L.Map, root: HTMLElement): Promise<void> {
   let tour;
   try {
@@ -210,6 +294,7 @@ export async function initializeMap(root: HTMLElement, mapContainer: HTMLElement
   const layerControl = createLayerControl(layers, layerManager);
   bottomControls.appendChild(layerControl);
   setupPrecacheControl(map, layerManager, layers, layerControl, offlineCacheService);
+  setupObservationMemos(map, root, bottomControls);
 
   await setupPoiOverlay(map, root);
 }

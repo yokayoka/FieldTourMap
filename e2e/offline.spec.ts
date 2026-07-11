@@ -42,8 +42,9 @@ test.describe("オフラインタイルキャッシュ（Requirement 3）", () =
     await context.setOffline(true);
 
     // 未閲覧の範囲へ大きくパンし、キャッシュにないタイルを要求させる。
+    // bottom-controlsに隠れない画面上部をクリックしてフォーカスする。
     const map = page.locator("#map");
-    await map.click();
+    await map.click({ position: { x: 195, y: 150 } });
     for (let i = 0; i < 10; i++) {
       await page.mouse.wheel(0, -200);
       await page.waitForTimeout(50);

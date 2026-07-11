@@ -53,3 +53,11 @@ export interface TourConfig {
   pois: PointOfInterest[];
   routes: RoutePath[];
 }
+
+export interface ObservationMemo {
+  id: string;
+  position: LatLng;
+  text: string;
+  createdAt: string;
+  updatedAt: string;
+}
