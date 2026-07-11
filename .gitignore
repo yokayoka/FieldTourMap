@@ -18,6 +18,9 @@ dist-ssr
 /blob-report/
 /playwright/.cache/
 
+# Claude Code local harness state
+.claude/scheduled_tasks.lock
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

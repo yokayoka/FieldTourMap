@@ -80,6 +80,22 @@
 
 **Phase 1 (MVP) 完了**: タスク1〜9すべて完了。地図表示・レイヤー切替・GNSS現在地表示・オフライン基盤なしの状態でのPOI/参考文献表示・レスポンシブUIの基本機能がGitHub Pages上で動作し、単体テスト81件・E2Eテスト10件がCIで継続的に検証される状態になった。
 
+### Phase 1完了後レビュー対応
+Phase 1完了後、8観点（正誤性3・再利用/簡素化/効率3・altitude・CLAUDE.md準拠）の並列コードレビューを実施し、実コードを直読して検証した10件の指摘をすべてTDDで修正した。
+
+- 🔴→✅️ `main.ts`の`loadLayers()`失敗が捕捉されず全画面が白くなる問題 → トップレベルcatchで`.app-error-banner`を表示するよう修正（E2Eテスト追加）
+- 🔴→✅️ `ConfigValidator`が不正なJSON（フィールド欠落・型不一致）で例外を投げる問題 → 型ガードを追加し常に`ValidationResult`を返すよう修正（テスト10件追加）
+- 🔴→✅️ `GeolocationService.startWatching()`の再入で前回のwatch/リスナーがリークする問題 → 再入時に自動`stopWatching()`するよう修正
+- 🔴→✅️ `deviceorientation`イベントが無制限に`onUpdate`を呼び追従モード中に過剰な`map.setView()`を発生させる問題 → 250msスロットリングを追加（注入可能な`now()`でテスト）
+- 🔴→✅️ `PoiRouteOverlay.renderTour()`が選択状態リセット時に`onSelectionChange(null)`を呼ばない問題 → `closePoiDetail()`経由に統一
+- 🔴→✅️ `main.ts`のPOI選択コールバックが古い`tour`をクロージャで固定する問題 → `PoiRouteOverlay.getPoiById()`を追加し常に最新ツアーを参照するよう修正
+- 🔴→✅️ `LayerManager`が永続化された`baseLayerId`のtype検証をしていない問題 → `type === "base"`チェックを追加
+- 🔴→✅️ `LayerManager.persist()`の`localStorage.setItem`例外がUI更新を阻害する問題 → try/catchで握りつぶすよう修正（副次的に`layerControl.ts`側の例外伝播も解消）
+- 🔴→✅️ コントラスト比回帰テストが不透明背景のみ検証しhalf-透明パネルを見落としていた問題 → `blendOverBackground()`を追加しワーストケース合成背景での検証を追加
+- 🔴→✅️ `.bottom-controls`に`env(safe-area-inset-bottom)`がなくノッチ端末で操作しづらい問題 → `.poi-detail-panel`と同様のセーフエリア対応を追加
+
+全修正後、単体テスト100件・E2Eテスト11件・lint・型チェック・buildすべて成功、Playwrightで正常系/異常系の実ブラウザ動作も確認済み。
+
 ## Phase 2: 機能拡張
 
 - [ ] 10. 🔴 Service Workerによるオフラインタイルキャッシュの実装

@@ -5,11 +5,12 @@ function createFakeGeolocation(): GeolocationApiLike & {
   successHandler?: (position: GeolocationPosition) => void;
   errorHandler?: (error: GeolocationPositionError) => void;
 } {
+  let nextWatchId = 1;
   const fake: ReturnType<typeof createFakeGeolocation> = {
     watchPosition: vi.fn((onSuccess, onError) => {
       fake.successHandler = onSuccess;
       fake.errorHandler = onError;
-      return 42;
+      return nextWatchId++;
     }),
     clearWatch: vi.fn(),
   };
@@ -151,11 +152,59 @@ describe("GeolocationService", () => {
     service.startWatching(vi.fn(), vi.fn());
     service.stopWatching();
 
-    expect(geolocation.clearWatch).toHaveBeenCalledWith(42);
+    expect(geolocation.clearWatch).toHaveBeenCalledWith(1);
     expect(orientationTarget.removeEventListener).toHaveBeenCalledWith(
       "deviceorientation",
       expect.any(Function),
     );
+  });
+
+  it("cleans up the previous watch/listener when startWatching is called again (re-entrancy safety)", () => {
+    const geolocation = createFakeGeolocation();
+    const orientationTarget = createFakeOrientationTarget();
+    const service = new GeolocationService({ geolocation, orientationTarget });
+
+    service.startWatching(vi.fn(), vi.fn());
+    service.startWatching(vi.fn(), vi.fn());
+
+    // 1回目のwatchPosition呼び出しが返したID(1)がクリアされていること。
+    expect(geolocation.clearWatch).toHaveBeenCalledWith(1);
+    expect(geolocation.watchPosition).toHaveBeenCalledTimes(2);
+    expect(orientationTarget.removeEventListener).toHaveBeenCalledTimes(1);
+    expect(orientationTarget.addEventListener).toHaveBeenCalledTimes(2);
+  });
+
+  it("throttles rapid orientation updates using the injected clock", () => {
+    const geolocation = createFakeGeolocation();
+    const orientationTarget = createFakeOrientationTarget();
+    let currentTime = 0;
+    const service = new GeolocationService({
+      geolocation,
+      orientationTarget,
+      now: () => currentTime,
+    });
+    const onUpdate = vi.fn();
+
+    service.startWatching(onUpdate, vi.fn());
+    geolocation.successHandler?.(fakePosition(35.68, 139.76, 12));
+    onUpdate.mockClear();
+
+    orientationTarget.fire("deviceorientation", { webkitCompassHeading: 10, alpha: null });
+    currentTime += 50; // スロットル窓内
+    orientationTarget.fire("deviceorientation", { webkitCompassHeading: 20, alpha: null });
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+
+    currentTime += 300; // スロットル窓を超過
+    orientationTarget.fire("deviceorientation", { webkitCompassHeading: 30, alpha: null });
+
+    expect(onUpdate).toHaveBeenCalledTimes(2);
+    expect(onUpdate).toHaveBeenLastCalledWith({
+      lat: 35.68,
+      lng: 139.76,
+      accuracy: 12,
+      heading: 30,
+    });
   });
 
   it("defaults follow mode to enabled and toggles it", () => {

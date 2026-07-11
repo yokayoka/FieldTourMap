@@ -60,6 +60,29 @@ describe("validateLayerDefinition", () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain("minZoomはmaxZoom以下である必要があります");
   });
+
+  // configLoaderはfetchしたJSONを`as T`で無検査キャストしてから渡すため、
+  // 実行時には型定義と一致しない（フィールド欠落・型不一致の）値が
+  // 渡ってくる可能性がある。例外を投げず、妥当性エラーとして報告すること。
+  it("reports an error instead of throwing when id is missing (malformed JSON)", () => {
+    const malformed = { ...validLayer, id: undefined } as unknown as LayerDefinition;
+    expect(() => validateLayerDefinition(malformed)).not.toThrow();
+    const result = validateLayerDefinition(malformed);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("idが空です");
+  });
+
+  it("reports an error instead of throwing when urlTemplate is missing", () => {
+    const malformed = { ...validLayer, urlTemplate: undefined } as unknown as LayerDefinition;
+    expect(() => validateLayerDefinition(malformed)).not.toThrow();
+    expect(validateLayerDefinition(malformed).valid).toBe(false);
+  });
+
+  it("reports an error instead of throwing when opacity is a non-numeric value", () => {
+    const malformed = { ...validLayer, opacity: "1.0" } as unknown as LayerDefinition;
+    expect(() => validateLayerDefinition(malformed)).not.toThrow();
+    expect(validateLayerDefinition(malformed).valid).toBe(false);
+  });
 });
 
 const validMedia: MediaLink = {
@@ -84,6 +107,18 @@ describe("validateMediaLink", () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain("captionが空です");
   });
+
+  it("reports an error instead of throwing when url is missing (malformed JSON)", () => {
+    const malformed = { ...validMedia, url: undefined } as unknown as MediaLink;
+    expect(() => validateMediaLink(malformed)).not.toThrow();
+    expect(validateMediaLink(malformed).valid).toBe(false);
+  });
+
+  it("reports an error instead of throwing when caption is missing", () => {
+    const malformed = { ...validMedia, caption: undefined } as unknown as MediaLink;
+    expect(() => validateMediaLink(malformed)).not.toThrow();
+    expect(validateMediaLink(malformed).valid).toBe(false);
+  });
 });
 
 const validPaper: ReferencePaper = {
@@ -106,6 +141,12 @@ describe("validateReferencePaper", () => {
     const result = validateReferencePaper({ ...validPaper, citation: "" });
     expect(result.valid).toBe(false);
     expect(result.errors).toContain("citationが空です");
+  });
+
+  it("reports an error instead of throwing when url is missing (malformed JSON)", () => {
+    const malformed = { ...validPaper, url: undefined } as unknown as ReferencePaper;
+    expect(() => validateReferencePaper(malformed)).not.toThrow();
+    expect(validateReferencePaper(malformed).valid).toBe(false);
   });
 });
 
@@ -162,5 +203,20 @@ describe("validateTourConfig", () => {
     });
     expect(result.valid).toBe(false);
     expect(result.errors).toContain("routes[0]: pointsは2点以上必要です");
+  });
+
+  it("reports an error instead of throwing when a POI's media/referencePapers are missing", () => {
+    const malformed = {
+      ...validTour,
+      pois: [{ ...validTour.pois[0], media: undefined, referencePapers: undefined }],
+    } as unknown as TourConfig;
+    expect(() => validateTourConfig(malformed)).not.toThrow();
+    expect(validateTourConfig(malformed).valid).toBe(false);
+  });
+
+  it("reports an error instead of throwing when pois/routes arrays are missing entirely", () => {
+    const malformed = { ...validTour, pois: undefined, routes: undefined } as unknown as TourConfig;
+    expect(() => validateTourConfig(malformed)).not.toThrow();
+    expect(validateTourConfig(malformed).valid).toBe(false);
   });
 });

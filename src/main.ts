@@ -22,6 +22,14 @@ export function mountApp(root: HTMLElement): void {
   root.replaceChildren(mapContainer);
 }
 
+function showFatalError(root: HTMLElement, message: string): void {
+  const banner = document.createElement("div");
+  banner.className = "app-error-banner";
+  banner.setAttribute("role", "alert");
+  banner.textContent = message;
+  root.appendChild(banner);
+}
+
 function createLocationIcon(heading: number | null): L.DivIcon {
   const arrow =
     heading !== null
@@ -91,6 +99,9 @@ async function setupPoiOverlay(map: L.Map, root: HTMLElement): Promise<void> {
   const detailPanel = createPoiDetailPanel(() => overlay.closePoiDetail());
   root.appendChild(detailPanel.root);
 
+  // POIの参照はoverlay.getPoiById()経由で行う。tour変数を直接クロージャで
+  // 保持すると、将来renderTour()が別のツアーで再度呼ばれた際に古いツアーの
+  // POI配列を参照し続けてしまうため。
   const overlay = new PoiRouteOverlay({
     map,
     onSelectionChange: (poiId) => {
@@ -98,7 +109,7 @@ async function setupPoiOverlay(map: L.Map, root: HTMLElement): Promise<void> {
         detailPanel.hide();
         return;
       }
-      const poi = tour.pois.find((p) => p.id === poiId);
+      const poi = overlay.getPoiById(poiId);
       if (poi) detailPanel.show(poi);
     },
   });
@@ -130,6 +141,12 @@ if (appRoot) {
   mountApp(appRoot);
   const mapContainer = appRoot.querySelector<HTMLDivElement>("#map");
   if (mapContainer) {
-    void initializeMap(appRoot, mapContainer);
+    initializeMap(appRoot, mapContainer).catch((error: unknown) => {
+      console.error("アプリの初期化に失敗しました", error);
+      showFatalError(
+        appRoot,
+        "アプリの初期化に失敗しました。しばらくしてから再度お試しください。",
+      );
+    });
   }
 }

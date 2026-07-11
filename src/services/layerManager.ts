@@ -56,7 +56,7 @@ export class LayerManager {
 
   private resolveInitialState(layers: LayerDefinition[]): ActiveLayerState {
     const persisted = this.readPersistedState();
-    if (persisted && this.layers.has(persisted.baseLayerId)) {
+    if (persisted && this.layers.get(persisted.baseLayerId)?.type === "base") {
       const validOverlayIds = persisted.overlayLayerIds.filter(
         (id) => this.layers.get(id)?.type === "overlay",
       );
@@ -93,7 +93,13 @@ export class LayerManager {
 
   private persist(): void {
     if (!this.storage) return;
-    this.storage.setItem(this.storageKey, JSON.stringify(this.getActiveLayerState()));
+    // 永続化はUXの補助であり必須ではないため、Safariのプライベート
+    // ブラウジングやストレージ容量超過で例外が出ても機能自体は継続する。
+    try {
+      this.storage.setItem(this.storageKey, JSON.stringify(this.getActiveLayerState()));
+    } catch (error) {
+      console.warn("レイヤー選択状態の保存に失敗しました", error);
+    }
   }
 
   private getLayerOrThrow(layerId: string): LayerDefinition {

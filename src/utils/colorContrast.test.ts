@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getContrastRatio } from "./colorContrast";
+import { blendOverBackground, getContrastRatio } from "./colorContrast";
 
 describe("getContrastRatio", () => {
   it("returns 21:1 for black on white (the maximum possible ratio)", () => {
@@ -36,5 +36,30 @@ describe("UI color pairs meet WCAG AA contrast (>= 4.5:1)", () => {
     ["poi-detail-panel description text on white", "#111111", "#ffffff"],
   ])("%s", (_label, foreground, background) => {
     expect(getContrastRatio(foreground, background)).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+  });
+
+  // .layer-control の背景は rgba(255, 255, 255, 0.92) の半透明パネルで、
+  // 地図タイルの上に重なって表示される（純白ではない）。地図タイルの色は
+  // 場所によって変わるため、最悪ケース（黒いタイル）を想定して合成した
+  // 背景色でも .layer-control__checkbox-label のテキストがAA基準を満たす
+  // ことを検証する。
+  it("layer-control__checkbox-label text meets AA contrast even over the worst-case (black) map tile", () => {
+    const worstCaseBackground = blendOverBackground("#ffffff", 0.92, "#000000");
+    expect(getContrastRatio("#111111", worstCaseBackground)).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+  });
+});
+
+describe("blendOverBackground", () => {
+  it("returns the overlay color unchanged when alpha is 1", () => {
+    expect(blendOverBackground("#1a5fb4", 1, "#000000")).toBe("#1a5fb4");
+  });
+
+  it("returns the background color unchanged when alpha is 0", () => {
+    expect(blendOverBackground("#1a5fb4", 0, "#00ff00")).toBe("#00ff00");
+  });
+
+  it("linearly interpolates each channel", () => {
+    // white(255) at 50% over black(0) => 128 per channel (rounded)
+    expect(blendOverBackground("#ffffff", 0.5, "#000000")).toBe("#808080");
   });
 });

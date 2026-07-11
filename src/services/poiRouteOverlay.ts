@@ -34,6 +34,7 @@ export class PoiRouteOverlay {
 
   private layers: L.Layer[] = [];
   private openPoiId: string | null = null;
+  private currentTour: TourConfig | null = null;
 
   constructor(options: PoiRouteOverlayOptions) {
     this.map = options.map;
@@ -45,7 +46,10 @@ export class PoiRouteOverlay {
   renderTour(tour: TourConfig): void {
     this.layers.forEach((layer) => this.map.removeLayer(layer));
     this.layers = [];
-    this.openPoiId = null;
+    this.currentTour = tour;
+    if (this.openPoiId !== null) {
+      this.closePoiDetail();
+    }
 
     tour.pois.forEach((poi) => {
       const marker = this.createMarker(poi, () => this.openPoiDetail(poi.id));
@@ -72,5 +76,9 @@ export class PoiRouteOverlay {
 
   getOpenPoiId(): string | null {
     return this.openPoiId;
+  }
+
+  getPoiById(poiId: string): PointOfInterest | undefined {
+    return this.currentTour?.pois.find((poi) => poi.id === poiId);
   }
 }

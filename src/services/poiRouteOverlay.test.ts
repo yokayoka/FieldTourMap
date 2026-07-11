@@ -111,7 +111,8 @@ describe("PoiRouteOverlay", () => {
   it("removes previous layers and resets selection when rendering a new tour", () => {
     const map = createFakeMap();
     const { createMarker, createPolyline, clickHandlers } = createFakeFactories();
-    const overlay = new PoiRouteOverlay({ map, createMarker, createPolyline });
+    const onSelectionChange = vi.fn();
+    const overlay = new PoiRouteOverlay({ map, createMarker, createPolyline, onSelectionChange });
 
     overlay.renderTour(tour);
     clickHandlers.get("poi-01")?.();
@@ -122,5 +123,55 @@ describe("PoiRouteOverlay", () => {
     expect(map.removed).toHaveLength(3);
     expect(map.added).toHaveLength(0);
     expect(overlay.getOpenPoiId()).toBeNull();
+    // 開いていたPOI詳細パネルを持つ呼び出し側にも閉じたことを通知すること。
+    expect(onSelectionChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it("does not notify the selection callback when rendering a new tour with nothing open", () => {
+    const map = createFakeMap();
+    const { createMarker, createPolyline } = createFakeFactories();
+    const onSelectionChange = vi.fn();
+    const overlay = new PoiRouteOverlay({ map, createMarker, createPolyline, onSelectionChange });
+
+    overlay.renderTour(tour);
+    overlay.renderTour({ ...tour, pois: [], routes: [] });
+
+    expect(onSelectionChange).not.toHaveBeenCalled();
+  });
+
+  it("looks up a POI by id from the most recently rendered tour", () => {
+    const map = createFakeMap();
+    const { createMarker, createPolyline } = createFakeFactories();
+    const overlay = new PoiRouteOverlay({ map, createMarker, createPolyline });
+
+    overlay.renderTour(tour);
+
+    expect(overlay.getPoiById("poi-02")?.name).toBe("露頭B");
+    expect(overlay.getPoiById("unknown-id")).toBeUndefined();
+  });
+
+  it("getPoiById reflects the tour from the latest renderTour call, not a stale one", () => {
+    const map = createFakeMap();
+    const { createMarker, createPolyline } = createFakeFactories();
+    const overlay = new PoiRouteOverlay({ map, createMarker, createPolyline });
+
+    overlay.renderTour(tour);
+    const otherTour: TourConfig = {
+      ...tour,
+      pois: [
+        {
+          id: "poi-99",
+          name: "新しいツアーの露頭",
+          description: "",
+          position: { lat: 0, lng: 0 },
+          media: [],
+          referencePapers: [],
+        },
+      ],
+    };
+    overlay.renderTour(otherTour);
+
+    expect(overlay.getPoiById("poi-01")).toBeUndefined();
+    expect(overlay.getPoiById("poi-99")?.name).toBe("新しいツアーの露頭");
   });
 });

@@ -158,4 +158,31 @@ describe("LayerManager", () => {
       overlayLayerIds: [],
     });
   });
+
+  it("falls back to defaults when the persisted baseLayerId now refers to an overlay-type layer", () => {
+    // レイヤー構成が更新され、以前はbaseだったIDがoverlayに変わった場合、
+    // 永続化された古いIDをbaseとして採用してはならない。
+    const storage = createFakeStorage();
+    storage.setItem(
+      "fieldtour.layerState.test",
+      JSON.stringify({ baseLayerId: "aist-geology", overlayLayerIds: [] }),
+    );
+
+    const { manager } = createManager({ storage });
+
+    expect(manager.getActiveLayerState().baseLayerId).toBe("gsi-std");
+  });
+
+  it("does not throw when persisting fails (e.g. storage quota exceeded / private browsing)", () => {
+    const throwingStorage: Storage = {
+      ...createFakeStorage(),
+      setItem: () => {
+        throw new DOMException("QuotaExceededError");
+      },
+    };
+    const { manager } = createManager({ storage: throwingStorage });
+
+    expect(() => manager.setBaseLayer("osm")).not.toThrow();
+    expect(manager.getActiveLayerState().baseLayerId).toBe("osm");
+  });
 });
