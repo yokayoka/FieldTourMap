@@ -97,6 +97,22 @@ describe("layersToSheet / sheetToLayers", () => {
     expect(sheetToLayers([])).toEqual([]);
     expect(sheetToLayers([["id", "name", "type"]])).toEqual([]);
   });
+
+  it("treats Google Sheets' auto-normalized uppercase TRUE/FALSE booleans as valid", () => {
+    // 人間がGoogleスプレッドシート上でtrue/falseと入力すると、スプレッドシート側が
+    // 自動的にブール型セルとして認識し、CSVエクスポート時には大文字のTRUE/FALSEに
+    // 正規化される（layersToSheetが書き出す小文字のtrue/falseとは異なる）。実際に
+    // 主催者が手入力・貼り付けしたシートを読み込む際にこの大文字表記に対応できないと、
+    // すべてのレイヤーがdefaultVisible: falseとして扱われてしまう。
+    const rows = [
+      ["id", "name", "type", "urlTemplate", "attribution", "opacity", "minZoom", "maxZoom", "defaultVisible"],
+      ["gsi-std", "地理院地図", "base", "https://example.com/{z}/{x}/{y}.png", "国土地理院", "1", "2", "18", "TRUE"],
+      ["osm", "OSM", "base", "https://example.com/osm/{z}/{x}/{y}.png", "OSM", "1", "2", "19", "FALSE"],
+    ];
+    const result = sheetToLayers(rows);
+    expect(result[0].defaultVisible).toBe(true);
+    expect(result[1].defaultVisible).toBe(false);
+  });
 });
 
 describe("mergeTourIntoSheets / extractTourFromSheets", () => {

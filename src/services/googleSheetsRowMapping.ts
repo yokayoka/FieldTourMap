@@ -95,7 +95,10 @@ export function sheetToLayers(rows: string[][]): LayerDefinition[] {
     opacity: Number(row.opacity),
     minZoom: Number(row.minZoom),
     maxZoom: Number(row.maxZoom),
-    defaultVisible: row.defaultVisible === "true",
+    // Googleスプレッドシートは貼り付けられたtrue/falseを自動的にブール型セルとして
+    // 認識し、CSVエクスポート時には大文字のTRUE/FALSEに正規化するため、大文字小文字
+    // を区別せずに判定する。
+    defaultVisible: row.defaultVisible.trim().toLowerCase() === "true",
   }));
 }
 
