@@ -61,10 +61,13 @@
   - Playwrightで実ブラウザ確認: マーカータップ→詳細パネル表示（メディア/参考文献分離、新規タブ属性）、閉じるボタン、参考文献なしPOIでのセクション省略、コンソールエラーなしをスクリーンショット付きで確認
   - _Requirements: 4, 4.1, 4.2_
 
-- [ ] 8. 🔴 レスポンシブモバイルUIベースラインの実装
+- [x] 8. ✅️ レスポンシブモバイルUIベースラインの実装
   - 幅360px基準のレスポンシブレイアウト
   - 主要操作（現在地表示・レイヤー切替）を親指操作範囲に配置
   - タップ対象44px角以上の確保、屋外視認性を考慮したコントラスト比の適用
+  - 完了メモ: WCAG相対輝度に基づく`getContrastRatio()`をTDDで実装（9テスト。黒白21:1等の既知値、実際のUI配色5組がAA基準4.5:1以上であることを固定する回帰テスト付き）。`.layer-control`と`.location-control`を個別のposition:fixedから共通の`.bottom-controls`flexコンテナに統合し、固定px値によるオーバーラップリスクを解消（location-controlが常にlayer-controlの上に積み上がる構造に変更）
+  - Playwrightで360×640ビューポート確認: 横スクロールなし（scrollWidth=clientWidth=360）、タップ対象5種すべて44px以上、location/layer control間の重なりなし、POI詳細パネルもレイアウト崩れなしをスクリーンショットで確認
+  - _Requirements: 6_
   - _Requirements: 6_
 
 - [ ] 9. 🔴 Phase 1統合テストとMVP動作確認

@@ -35,7 +35,7 @@ function createLocationIcon(heading: number | null): L.DivIcon {
   });
 }
 
-function setupLocationTracking(map: L.Map, root: HTMLElement): void {
+function setupLocationTracking(map: L.Map, bottomControls: HTMLElement): void {
   const geolocationService = new GeolocationService();
   let marker: L.Marker | null = null;
   let accuracyCircle: L.Circle | null = null;
@@ -43,7 +43,7 @@ function setupLocationTracking(map: L.Map, root: HTMLElement): void {
   const locationControl = createLocationControl({
     onToggleFollow: (enabled) => geolocationService.setFollowMode(enabled),
   });
-  root.appendChild(locationControl.root);
+  bottomControls.appendChild(locationControl.root);
 
   const handleUpdate = (update: GeolocationUpdate): void => {
     locationControl.clearError();
@@ -108,12 +108,20 @@ async function setupPoiOverlay(map: L.Map, root: HTMLElement): Promise<void> {
 
 export async function initializeMap(root: HTMLElement, mapContainer: HTMLElement): Promise<void> {
   const map = L.map(mapContainer).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+
+  // 現在地ボタンとレイヤーパネルは同じ画面下部の親指可動域にまとめる
+  // （Requirement 6.2）。location-controlを先に追加し、上側に表示する。
+  const bottomControls = document.createElement("div");
+  bottomControls.className = "bottom-controls";
+  root.appendChild(bottomControls);
+
+  setupLocationTracking(map, bottomControls);
+
   const layers = await loadLayers();
   const layerManager = new LayerManager({ map, layers, storage: window.localStorage });
   const layerControl = createLayerControl(layers, layerManager);
-  root.appendChild(layerControl);
+  bottomControls.appendChild(layerControl);
 
-  setupLocationTracking(map, root);
   await setupPoiOverlay(map, root);
 }
 

@@ -10,13 +10,27 @@ body,
   height: 100%;
 }
 
-/* 片手操作を想定し、画面下部（親指の可動域）に配置する（Requirement 6.2） */
-.layer-control {
+/*
+ * 片手操作を想定し、画面下部（親指の可動域）に主要操作をまとめて配置する
+ * （Requirement 6.2）。location-control（現在地ボタン）とlayer-control
+ * （レイヤーパネル）は個別に position:fixed を持たず、このコンテナ内の
+ * flexboxで積み上げる。片方の高さが変化しても重なりが発生しない。
+ */
+.bottom-controls {
   position: fixed;
   left: 8px;
   right: 8px;
   bottom: 8px;
   z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-height: calc(100vh - 16px);
+}
+
+.layer-control {
+  align-self: stretch;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -65,12 +79,7 @@ body,
   height: 22px;
 }
 
-/* 現在地ボタンは片手の親指で届く画面右下に配置する（Requirement 6.2） */
 .location-control {
-  position: fixed;
-  right: 8px;
-  bottom: 220px;
-  z-index: 1000;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
