@@ -182,8 +182,13 @@ Phase 1完了後、8観点（正誤性3・再利用/簡素化/効率3・altitude
   - 本タスクはレビュー・ドキュメント化が主目的でありアプリケーションコードの変更は行っていないため、既存のテストスイート（単体244件・E2E 35件）に影響はない
   - _Requirements: 8_
 
-- [ ] 19. 🔴 PWA対応強化
+- [x] 19. ✅️ PWA対応強化
   - `manifest.json`とアイコン一式の作成、ホーム画面へのインストール対応
+  - 完了メモ: `public/manifest.json`を新設（`display: standalone`、`icons`にany用途192/512pxとmaskable用途512pxを含む）。アイコン画像は新規ライブラリ導入を避けるため、既存devDependencyのPlaywrightで簡易SVG→PNGラスタライズを行い生成した（`public/icons/icon.svg`/`icon-maskable.svg`が元データ、生成スクリプトは使い捨てのためリポジトリには含めていない）。アプリの配色（青#1a5fb4・アンバー#f5a623の観察ポイントマーカー色）を踏襲した山と観察点のシンプルな意匠とした。maskable用は安全域（中心80%円）に収まるよう縮小して配置
+  - `index.html`に`<link rel="manifest">`・favicon（SVG）・`apple-touch-icon`・`theme-color`・iOS向け`apple-mobile-web-app-*`メタタグを追加。パスはVite標準の`%BASE_URL%`プレースホルダを用い、開発時（`/`）と本番（`/FieldTourMap/`）双方で正しいURLに解決されることをビルド成果物（`dist/index.html`）で確認した
+  - `e2e/pwa.spec.ts`を新規TDDで追加（2テスト）: manifest.jsonが実際にリンクされ`display: standalone`・`icons`（maskable含む）等ホーム画面インストールに必要な情報を持つこと、参照先アイコンファイルが実際に取得できること、iOS向けメタタグ・apple-touch-iconも同様に検証
+  - インストール可能性の要件（Chromeの`beforeinstallprompt`条件: 有効なmanifest + fetchハンドラを持つService Worker）は、Task 10で実装済みの`public/sw.js`（fetchイベントリスナー登録済み）と今回のmanifestの組み合わせで満たされる設計とした
+  - 既知のスコープ限定: PWA化は参加者向けMap Viewer（`index.html`）のみを対象とし、主催者向けAdmin Config Tool（`admin-tool/`）はホーム画面インストール対象外とした（design.mdのファイル構成上も参加者向けアプリのみがオフライン運用対象であるため）
   - _Requirements: 6, 7_
 
 - [ ] 20. 🔴 複数実習（ツアー）切替UIの実装

@@ -1,0 +1,22 @@
+{
+  "name": "Field Tour - 野外教育WebGIS",
+  "short_name": "FieldTour",
+  "description": "地理学・地質学の野外教育向けWebGISアプリ。現在地表示、複数レイヤー切替、見学ポイントの写真・参考文献表示に対応。",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1a5fb4",
+  "orientation": "any",
+  "lang": "ja",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    {
+      "src": "icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
