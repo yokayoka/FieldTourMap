@@ -18,8 +18,8 @@
   - `.github/workflows/deploy.yml` の作成（push時にlint→型チェック→単体テスト→buildを実行）
   - テスト失敗時にGitHub Pagesへのデプロイをブロックする設定
   - GitHub Pagesへの自動デプロイ設定（base path・サブパス配信を考慮）
-  - 完了メモ: 公式Actions方式（`upload-pages-artifact` + `deploy-pages`）を採用。buildジョブ成功後にのみdeployジョブが走る`needs:`構成。`vite.config.ts`のbase pathを実リポジトリ名`FieldTourMap`に合わせて修正し、ビルド成果物のパスを確認済み。リモート`origin`を`https://github.com/yokayoka/FieldTourMap.git`として登録
-  - 残タスク: GitHubリポジトリのSettings → Pages → Source を「GitHub Actions」に変更（初回push後、リポジトリ側で手動設定が必要）
+  - 完了メモ: 公式Actions方式（`upload-pages-artifact` + `deploy-pages`）を採用。buildジョブ成功後にのみdeployジョブが走る`needs:`構成。`vite.config.ts`のbase pathを実リポジトリ名`FieldTourMap`に合わせて修正し、ビルド成果物のパスを確認済み。リモート`origin`を`https://github.com/yokayoka/FieldTourMap.git`として登録し、push・Pages設定（Source: GitHub Actions）・`workflow_dispatch`による再実行まで完了。build/deploy両ジョブが成功し、`https://yokayoka.github.io/FieldTourMap/`で公開稼働を確認済み
+  - 既知の注意点: Pages未有効化のままpushすると`deploy-pages`が404で失敗する（初回のみ）。Pages設定を先に有効化しておくか、有効化後に`workflow_dispatch`で再実行すればよい
   - _Requirements: 9, 12_
 
 - [ ] 3. 🔴 コアデータモデルとConfigLoader/ConfigValidatorの実装（TDD）
