@@ -3,6 +3,8 @@
 ## Overview
 本システムは、地理学・地質学の野外教育を支援するスマートフォン向けWebGIS（Leafletベース）であり、Phase 1ではサーバーを持たないGitHub Pages上の静的SPA（Single Page Application）として構築する。レイヤー構成・見学ポイント（POI）・巡検ルート・メディアリンクはリポジトリ内のJSON設定ファイルとして管理し、主催者はローカルの管理用Webツールでこれらを編集してGitにコミット・プッシュすることでサイトへ反映する。GNSS位置表示、オフラインタイルキャッシュ、URL共有、Googleマップ連携リンクなど、参加者側の機能はすべてクライアントサイド（ブラウザ）で完結させ、外部サービス（タイル配信元、Google Drive/Dropbox、Googleマップ、X/LINE）とは疎結合な連携（リンク遷移・fetch）のみを行う。
 
+Requirement 15・16により、GitHubを使わない第三者の主催者も本アプリを流用できる。主催者はGoogleスプレッドシート上でレイヤー・ツアーを編集し（Admin Config ToolからOAuth経由で読み書き）、スプレッドシートを「ウェブに公開」設定した上でそのIDをURLパラメータ（`?project=<spreadsheetId>`）として参加者に共有する。参加者向けMap Viewerはこのパラメータを検出すると、GitHubリポジトリのフォーク・デプロイなしに、認証情報を一切使わない公開CSV読み取りのみでそのプロジェクトを表示する。
+
 ## Architecture
 
 ### High-Level Architecture
@@ -10,6 +12,10 @@
 graph TD
     subgraph ORG["主催者環境 (Organizer / Local)"]
         AdminTool["管理用ローカルWebツール<br/>Admin Config Tool"]
+    end
+
+    subgraph THIRDPARTY["第三者主催者 (GitHub不使用, Requirement 16)"]
+        ThirdPartyOrganizer["独自のGoogleスプレッドシート<br/>（ウェブに公開設定）"]
     end
 
     subgraph REPO["Gitリポジトリ"]
@@ -40,6 +46,7 @@ graph TD
         GoogleMaps["Google マップ (アプリ/Web)"]
         SNS["X / LINE 等 SNS"]
         GSheets["Google Sheets API<br/>(OAuth 2.0, Admin Tool専用)"]
+        PublicCSV["公開CSVエンドポイント<br/>(認証不要, Map Viewer用)"]
     end
 
     AdminTool -- "OAuth認可・読み書き" --> GSheets
@@ -49,9 +56,12 @@ graph TD
     REPO -- "push トリガ" --> Actions
     Actions -- "build & deploy" --> StaticApp
     Actions -- "deploy" --> ConfigFiles
+    ThirdPartyOrganizer -- "ウェブに公開" --> PublicCSV
+    ThirdPartyOrganizer -- "?project=&lt;sheetId&gt; を参加者に共有" --> MapViewer
 
     StaticApp -. 配信 .-> MapViewer
-    MapViewer -- "fetch()" --> ConfigFiles
+    MapViewer -- "project未指定時: fetch()" --> ConfigFiles
+    MapViewer -- "project指定時: fetch()（認証なし）" --> PublicCSV
     MapViewer -- "タイルリクエスト" --> TileProviders
     MapViewer <--> SW
     MapViewer -- "読み書き" --> LocalStore
@@ -64,7 +74,7 @@ graph TD
 ```
 
 ### System Components
-- **Map Viewer App**: 参加者（学生）がスマートフォンブラウザで利用するメインのSPA。地図表示、GNSS現在地、レイヤー切替、POI/ルート表示、観察メモ、URL共有、Googleマップ連携を担う。
+- **Map Viewer App**: 参加者（学生）がスマートフォンブラウザで利用するメインのSPA。地図表示、GNSS現在地、レイヤー切替、POI/ルート表示、観察メモ、URL共有、Googleマップ連携を担う。`project`パラメータ指定時は、公開Googleスプレッドシートからの読み取り専用プロジェクト読み込み（Requirement 16）も行うが、認証情報は一切扱わない。
 - **Admin Config Tool**: 主催者がレイヤー・POI・ルート・メディアリンクを編集するためのローカル実行Webツール（アプリ本体とは別バンドル）。編集結果はJSONファイルとして出力し、Git操作は主催者自身が行う。Googleスプレッドシートとの保存・読み込み（Requirement 15）も本ツールにのみ実装する。
 - **Config Repository (JSON)**: レイヤー定義・ツアー（実習）単位のPOI/ルート/メディアリンクを保持するバージョン管理対象のJSONファイル群。GitHub Pagesへ実際にデプロイされる正式形式。
 - **Service Worker / Offline Cache**: 閲覧済みタイル・アプリアセットをキャッシュし、圏外時の閲覧継続を支える。
@@ -158,8 +168,9 @@ interface GoogleMapsLinkParams {
 ### MapViewer（ルートコンポーネント）
 **Responsibilities:**
 - Leaflet地図インスタンスの初期化と各サブサービスの統合
-- URLクエリ/ハッシュからの初期表示状態（共有ビュー、ツアーID含む）復元
+- URLクエリ/ハッシュからの初期表示状態（共有ビュー、ツアーID、`project`パラメータ含む）復元
 - 複数ツアー間の切替（`listAvailableTours()`の一覧からの選択、選択に応じたPOI/ルート再描画とレイヤー構成の初期値提案）
+- `project`パラメータが指定された場合、`PublicSheetProjectLoader`経由での第三者プロジェクトの読み込みへの切替（Requirement 16）
 - 画面レイアウト（レイヤーコントロール、現在地ボタン、共有・ツアー切替・Googleマップボタン等）の配置
 
 **Key Methods:**
@@ -173,6 +184,7 @@ interface GoogleMapsLinkParams {
 **Responsibilities:**
 - 実行時に `config/layers.json` および `config/tours/*.json` をfetchし、TourConfig/LayerDefinitionへパースする
 - 取得したJSONのスキーマ検証（ConfigValidatorを利用）
+- URLに`project`パラメータ（Requirement 16）が指定されている場合は、`PublicSheetProjectLoader`へ委譲する
 
 **Key Methods:**
 - `loadLayers(): Promise<LayerDefinition[]>`
@@ -282,27 +294,53 @@ interface GoogleMapsLinkParams {
 - 地図プレビューは各ページの`main.ts`（`admin-tool/src/main.ts`, `admin-tool/src/tourEditorMain.ts`）がLeafletインスタンスを直接操作して実現（上記`previewOnMap`に相当）
 - `adminNav`: 2ページ間の移動用共有ナビゲーション
 
+### GoogleSheetsRowMapping（共有ライブラリ：Admin Tool / Map Viewer 双方で利用）
+**Responsibilities:**
+- `LayerDefinition[]`・`TourConfig`（POI/メディア/参考文献/ルート/ルート頂点）と、スプレッドシートの複数シート（タブ）の行表現との相互変換。認証情報やネットワークI/Oを一切含まない純粋な変換ロジック
+- `mergeTourIntoSheets`は対象`tour.id`の行のみを置換し、他ツアーの行は保持する（既存シートへの非破壊マージ）
+
+認証・I/Oを伴わない純粋関数であるため、`ConfigValidator`同様Admin Config Tool（書き込み用）とMap Viewer（読み取り用、Requirement 16）の双方から利用する共有モジュールとして実装する。
+
+**Key Functions:**
+- `layersToSheet(layers): string[][]` / `sheetToLayers(rows): LayerDefinition[]`
+- `mergeTourIntoSheets(existing, tour): SheetsData` / `extractTourFromSheets(sheets, tourId): TourConfig | null`
+
 ### GoogleSheetsProjectService（Requirement 15、Admin Config Tool専用）
 **Responsibilities:**
 - Google Identity Services（GIS）を用いたOAuth 2.0認可（アクセストークン取得）。主催者自身のGoogle CloudプロジェクトのOAuthクライアントIDを設定画面で入力し利用する
-- Google Sheets API v4（REST、`fetch`による直接呼び出し）を用いた、指定スプレッドシートへの読み書き
-- レイヤー一覧・現在編集中のツアー（POI/メディア/参考文献/ルート）と、スプレッドシートの複数シート（タブ）表現との相互変換
+- Google Sheets API v4（REST、`fetch`による直接呼び出し）を用いた、指定スプレッドシートへの読み書き（GoogleSheetsRowMappingで変換）
 
 **設計方針:**
 - Google製の重量級クライアントライブラリ（`gapi`）は使わず、GIS（`https://accounts.google.com/gsi/client`をAdmin Toolページに動的読み込み）でトークンを取得し、以降は`fetch()`でSheets API RESTエンドポイントを直接呼び出す。新規npm依存を追加しない
 - OAuthスコープは`https://www.googleapis.com/auth/spreadsheets`（読み書き）。主催者が指定した既存スプレッドシートIDを読み込む必要がある（Requirement 15.2）ため、作成元がアプリに限定される`drive.file`スコープでは要件を満たせないと判断した
-- 参加者向けMap Viewerには一切組み込まない（Requirement 15.7）。OAuthクライアントID・トークンはAdmin Config Tool（ローカル実行）のブラウザメモリ/localStorageにのみ保持し、リポジトリにコミットしない
+- OAuthを用いた読み書きはAdmin Config Tool（ローカル実行）専用とし、参加者向けMap Viewerには一切組み込まない（Requirement 15.7）。OAuthクライアントID・トークンはAdmin Config Toolのブラウザメモリ/localStorageにのみ保持し、リポジトリにコミットしない
 
 **Key Methods:**
 - `authorize(clientId: string): Promise<boolean>`
 - `isAuthorized(): boolean`
 - `saveLayers(spreadsheetId: string, layers: LayerDefinition[]): Promise<void>`
 - `loadLayers(spreadsheetId: string): Promise<LayerDefinition[]>`
-- `saveTour(spreadsheetId: string, tour: TourConfig): Promise<void>`（`Tours`/`POIs`/`Media`/`ReferencePapers`/`Routes`/`RoutePoints`各シートのうち、対象`tour.id`に該当する行のみ置換。他のツアーの行は保持する）
+- `saveTour(spreadsheetId: string, tour: TourConfig): Promise<void>`
 - `loadTour(spreadsheetId: string, tourId: string): Promise<TourConfig>`
 
+### PublicSheetProjectLoader（Requirement 16、Map Viewer専用）
+**Responsibilities:**
+- URLクエリパラメータ`project`にGoogleスプレッドシートIDが指定された場合、認証情報なしでそのスプレッドシートの内容（レイヤー・ツアー）を取得する
+- 取得したCSVをパースし、GoogleSheetsRowMappingで`LayerDefinition[]`/`TourConfig`へ変換する
+
+**設計方針:**
+- OAuth・APIキーを一切使わない。スプレッドシートの「ウェブに公開」機能で得られる公開CSVエンドポイント（`https://docs.google.com/spreadsheets/d/{id}/gviz/tq?tqx=out:csv&sheet={シート名}`）を`fetch()`するのみ（Requirement 16.2, 8）
+- CSVパースは新規npm依存を追加せず、RFC 4180準拠の小さな自前パーサー（`ObservationMemoStore.exportAsCsv()`が書き出す形式と対称）で実装する
+- `ConfigLoader`は`project`パラメータの有無に応じて、本ローダーと従来の静的JSON読み込みを切り替える（Requirement 16.5、既存動作は変更しない）
+- 第三者が作成したプロジェクトの内容は検証しない（できない）ため、POI説明文等はこれまで通り`textContent`で描画しHTMLとして解釈しない（Requirement 16.7。既存の全コンポーネントが既にこの方針で実装済み）
+
+**Key Methods:**
+- `loadLayers(spreadsheetId: string): Promise<LayerDefinition[]>`
+- `loadTour(spreadsheetId: string, tourId: string): Promise<TourConfig>`
+- `listAvailableTours(spreadsheetId: string): Promise<{ id: string; title: string }[]>`
+
 ### スプレッドシートのシート（タブ）構成
-1つのGoogleスプレッドシートを、正規化されたテーブル群と同様に複数シートへ分割して保持する（Database Schemaで示す将来のテーブル構成と対応させている）。
+1つのGoogleスプレッドシートを、正規化されたテーブル群と同様に複数シートへ分割して保持する（Database Schemaで示す将来のテーブル構成と対応させている）。Admin Config Tool（読み書き、Requirement 15）とMap Viewer（読み取り専用、Requirement 16）の両方が同一の構成を前提とする。
 
 | シート名 | 列 | 対応する型 |
 | --- | --- | --- |
@@ -314,7 +352,10 @@ interface GoogleMapsLinkParams {
 | `Routes` | tourId, routeId, name | `RoutePath`（メタデータのみ） |
 | `RoutePoints` | tourId, routeId, order, lat, lng | `RoutePath.points`の各要素 |
 
-`tourId`/`poiId`/`routeId`は関連する行を紐付ける外部キー相当の役割を持つ。`saveTour`/`loadTour`は`tourId`列でフィルタし、対象ツアー以外の既存行には影響を与えない。
+`tourId`/`poiId`/`routeId`は関連する行を紐付ける外部キー相当の役割を持つ。`saveTour`/`loadTour`（Admin Tool側）は`tourId`列でフィルタし、対象ツアー以外の既存行には影響を与えない。
+
+### プロジェクトごとのローカルストレージ分離（Requirement 16.9）
+同一ブラウザで異なる`project`パラメータ（またはパラメータなしの既定プロジェクト）を閲覧した際に、観察メモ・レイヤー選択状態・ツアー選択状態が混在しないよう、各ストア（`ObservationMemoStore`, `LayerManager`, `tourSelection`ユーティリティ）はいずれも既存のDIパターン（`storageKey`オプション）を活かし、`main.ts`側で`project`パラメータから導出したサフィックス（例: `fieldtour.memos.v1` → `fieldtour.memos.v1.project.<spreadsheetId>`）を付与したキーを注入する。`project`パラメータなし（既定の静的サイト運用）の場合は既存のキーをそのまま使い、既存ユーザーの永続化データに影響を与えない。
 
 ## Data Models
 
@@ -511,6 +552,7 @@ repo-root/
 - **Service Worker登録失敗**: キャッシュ機能なしで通常のネットワーク経由動作にフォールバックし、アプリの起動自体は継続する。
 - **外部タイル配信元の一時的エラー（5xx等）**: 一定回数リトライ後、該当ベースレイヤーが利用不可である旨をユーザーに通知し、他のベースレイヤーへの切替を促す。
 - **Googleスプレッドシート連携の失敗（Requirement 15.6）**: OAuth認可拒否・トークン期限切れ、Sheets APIエラー（存在しないスプレッドシートID、権限不足等）、シート形式不正（列欠落・型不一致）のいずれも、Admin Config Tool上にエラーメッセージを表示するに留め、既存のJSONダウンロード等の他機能には影響を与えない。
+- **`project`パラメータでの読み込み失敗（Requirement 16.6）**: スプレッドシートが「ウェブに公開」されていない、IDが誤っている、CSV取得に失敗、シート形式が不正、のいずれの場合も、`showFatalError`等の既存の致命的エラー表示パターンに準じたユーザー向けメッセージを表示し、真っ白な画面のまま停止しない。第三者が作成した未検証のコンテンツを扱うため、POI説明文等は常にDOM APIの`textContent`で描画し、HTML/スクリプトとして解釈しない（Requirement 16.7）。
 
 ## Testing Strategy
 - **単体テスト**（Vitest、jsdom環境。2026-07-11時点で287件）:
@@ -519,7 +561,9 @@ repo-root/
   - `ConfigValidator`: タイルURLテンプレート検証、メディアリンク検証の正常系・異常系
   - `ObservationMemoStore`: CRUD操作、CSV/GeoJSONエクスポート内容の妥当性
   - `LayerManager`: レイヤー切替状態のlocalStorage永続化・復元
-  - `GoogleSheetsProjectService`: レイヤー/ツアーとシート行表現の相互変換（往復一致）、OAuth/Sheets API呼び出しをフェイクに差し替えた正常系・異常系（Requirement 15）
+  - `GoogleSheetsRowMapping`: レイヤー/ツアーとシート行表現の相互変換（往復一致、他ツアー行の非破壊）
+  - `GoogleSheetsProjectService`: OAuth/Sheets API呼び出しをフェイクに差し替えた正常系・異常系（Requirement 15）
+  - `PublicSheetProjectLoader`: CSVパースの正常系・異常系（引用符・カンマ・改行を含むフィールド、未公開/形式不正時のフォールバック、Requirement 16）
   - `@vitest/coverage-v8`によるカバレッジ計測（`npm run test:coverage`）。design.mdの方針通り、Leafletとの実結合部分（デフォルトのタイル/マーカー生成関数等）はE2Eで担保する前提のためカバレッジ計測対象から除外している
 - **結合テスト**（Playwright、モバイル端末プロファイル。2026-07-11時点で44件）:
   - レイヤーコントロール操作によるベース/オーバーレイ切替とページ再読み込み後の状態復元（Requirement 2.5）

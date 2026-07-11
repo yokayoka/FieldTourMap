@@ -275,18 +275,38 @@ Phase 4完了後、ユーザーからの追加要望によりRequirement 15（Go
   - 単体テスト287件→310件（+23）、E2Eテスト44件（変更なし、影響なし）、lint・型チェック・buildすべて成功
   - _Requirements: 15_
 
-- [ ] 26. 🔴 Admin Config Tool（レイヤー編集）へのGoogleスプレッドシート連携統合
+Task 25完了後、ユーザーとの議論により「GitHubを使わない第三者主催者が本アプリを流用できるようにしたい」という、当初のRequirement 15の想定より大きな目的が判明した。これに対応するためRequirement 16（参加者向けMap Viewerでの、認証なし公開CSV経由のプロジェクト読み込み）を追加し、以下の通りタスクを再編した。
+
+- [ ] 26. 🔴 GoogleSheetsRowMappingの共有化とCSVパーサーの実装（TDD）
+  - `admin-tool/src/services/googleSheetsRowMapping.ts`を`src/services/`へ移動し、`ConfigValidator`同様Admin Tool/Map Viewer双方から利用する共有モジュールとする（Admin Tool側のimportパス・既存テストへの影響を確認）
+  - RFC 4180準拠の小さなCSVパーサー/シリアライザを新規実装（引用符・カンマ・改行を含むフィールドの往復一致をTDDで確認）。新規npm依存は追加しない
+  - _Requirements: 15, 16_
+
+- [ ] 27. 🔴 PublicSheetProjectLoaderの実装（TDD）
+  - `project`パラメータで指定されたスプレッドシートIDから、公開CSVエンドポイント経由で認証なしにレイヤー/ツアーを取得する`loadLayers`/`loadTour`/`listAvailableTours`をTDD実装
+  - 未公開・ID誤り・シート形式不正・ネットワークエラー時の異常系テスト
+  - _Requirements: 16_
+
+- [ ] 28. 🔴 Map Viewerへの`project`パラメータ統合
+  - `ConfigLoader`が`project`パラメータの有無に応じて`PublicSheetProjectLoader`と従来の静的JSON読み込みを切り替えるよう拡張
+  - `main.ts`で観察メモ・レイヤー選択・ツアー選択の永続化キーをプロジェクトごとに分離（Requirement 16.9）
+  - 共有URL（ShareLinkService）に`project`パラメータを含め、受信者が同じプロジェクトを再現できるようにする（Requirement 16.8）
+  - E2Eテスト（Playwrightのルートインターセプトで公開CSVレスポンスを模擬し、`?project=`付きURLでの表示・エラー時のフォールバックを確認）
+  - _Requirements: 16_
+
+- [ ] 29. 🔴 Admin Config Tool（レイヤー編集）へのGoogleスプレッドシート連携統合
   - OAuthクライアントID・スプレッドシートIDの入力UI（localStorageへの保存）
   - 「スプレッドシートに保存」「スプレッドシートから読み込む」ボタンの追加、`AdminLayerListStore`との連携
   - 成功/失敗のフィードバック表示、失敗時も既存のJSONダウンロード機能に影響を与えないことをテストで確認
   - _Requirements: 15_
 
-- [ ] 27. 🔴 Admin Config Tool（ツアー編集）へのGoogleスプレッドシート連携統合
-  - Task 26と同様のUIをツアー編集ページに追加し、`AdminTourStore`と連携（現在編集中の`tourId`のみを対象に保存・読み込み）
+- [ ] 30. 🔴 Admin Config Tool（ツアー編集）へのGoogleスプレッドシート連携統合
+  - Task 29と同様のUIをツアー編集ページに追加し、`AdminTourStore`と連携（現在編集中の`tourId`のみを対象に保存・読み込み）
   - 複数ツアーを含むスプレッドシートから対象ツアーのみを読み込めることのテスト
   - _Requirements: 15_
 
-- [ ] 28. 🔴 セットアップドキュメント整備と最終確認
-  - `docs/organizer-guide.md`にGoogle Cloudプロジェクト作成・OAuth同意画面設定（テストユーザー登録）・OAuthクライアントID発行の手順を追記
-  - 実際にGoogle Sheets APIとの疎通を確認できる範囲（単体テスト・UIの手動確認）で最終確認し、実際のOAuth同意画面・スプレッドシート読み書きはユーザー自身による確認が必要である旨を明記
-  - _Requirements: 15_
+- [ ] 31. 🔴 セットアップ・運用ドキュメント整備と最終確認
+  - `docs/organizer-guide.md`にGoogle Cloudプロジェクト作成・OAuth同意画面設定（テストユーザー登録）・OAuthクライアントID発行の手順（Requirement 15向け）と、スプレッドシートの「ウェブに公開」手順・`?project=`URLの共有方法（Requirement 16向け、GitHubを使わない第三者主催者向けの案内として）を追記
+  - `SECURITY.md`に、第三者が作成した未検証のプロジェクト（タイルURL・POI内容等）を読み込むことに伴うリスクと、それに対する既存の緩和策（`textContent`によるレンダリング、認証情報を扱わないこと等）を追記
+  - 実際にGoogle Sheets APIとの疎通・公開CSV読み込みを確認できる範囲（単体テスト・UIの手動確認）で最終確認し、実際のOAuth同意画面・スプレッドシート共有設定はユーザー自身による確認が必要である旨を明記
+  - _Requirements: 15, 16_
