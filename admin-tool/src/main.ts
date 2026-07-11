@@ -17,6 +17,13 @@ const GOOGLE_SHEETS_SPREADSHEET_ID_KEY = "fieldtour-admin.googleSheets.spreadshe
 const DEFAULT_CENTER: L.LatLngExpression = [35.681236, 139.767125];
 const DEFAULT_ZOOM = 12;
 
+// プレビュー対象のレイヤーが現在の表示範囲にデータを持たない場合（例:
+// 特定地域専用のタイルを東京付近のデフォルト表示位置でプレビューする場合）
+// でも、常に背景に基準地図を表示しておくことで、ユーザーが地図を見ながら
+// 目的の地域までパン・ズームできるようにする。
+const REFERENCE_LAYER_URL = "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png";
+const REFERENCE_LAYER_ATTRIBUTION = "地理院タイル（国土地理院）";
+
 interface Layout {
   listSection: HTMLElement;
   formSection: HTMLElement;
@@ -102,6 +109,7 @@ async function main(): Promise<void> {
 
   const store = new AdminLayerListStore();
   const map = L.map(mapContainer).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+  L.tileLayer(REFERENCE_LAYER_URL, { attribution: REFERENCE_LAYER_ATTRIBUTION }).addTo(map);
   let previewLayer: L.Layer | null = null;
 
   function updatePreview(layer: LayerDefinition): void {

@@ -101,6 +101,39 @@ test.describe("Admin Config Tool: レイヤー編集（Requirement 11, 10）", (
     });
   });
 
+  test("プレビュー対象レイヤーが現在の表示範囲にデータを持たなくても、常に基準地図が背景に表示される", async ({
+    page,
+  }) => {
+    await page.goto("/admin-tool/");
+    await page.locator(".layer-list-view__add").click();
+
+    // 能登半島専用タイル等、初期表示位置（東京付近）にはデータが存在しない
+    // レイヤーを想定し、常に404を返すURLで模擬する。
+    await page.route("https://example.com/no-coverage-here/**", (route) =>
+      route.fulfill({ status: 404, body: "" }),
+    );
+
+    await page.fill('.layer-editor-form [name="id"]', "no-coverage-layer");
+    await page.fill('.layer-editor-form [name="name"]', "被覆範囲外レイヤー");
+    await page.fill(
+      '.layer-editor-form [name="urlTemplate"]',
+      "https://example.com/no-coverage-here/{z}/{x}/{y}.png",
+    );
+    await page.fill('.layer-editor-form [name="attribution"]', "テスト");
+    await page.fill('.layer-editor-form [name="opacity"]', "1");
+    await page.fill('.layer-editor-form [name="minZoom"]', "0");
+    await page.fill('.layer-editor-form [name="maxZoom"]', "18");
+
+    await page.locator(".layer-editor-form__preview").click();
+
+    // プレビュー対象のタイルはすべて404だが、基準地図（地理院地図標準）が
+    // 常に背景に表示され続けるため、地図上には読み込み済みタイルが存在し、
+    // ユーザーはそれを見ながら目的地へパン・ズームできる。
+    await expect(page.locator("#preview-map .leaflet-tile-loaded").first()).toBeVisible({
+      timeout: 10_000,
+    });
+  });
+
   test("layers.jsonをダウンロードできる", async ({ page }) => {
     await page.goto("/admin-tool/");
 
