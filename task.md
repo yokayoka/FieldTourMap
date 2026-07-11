@@ -22,10 +22,11 @@
   - 既知の注意点: Pages未有効化のままpushすると`deploy-pages`が404で失敗する（初回のみ）。Pages設定を先に有効化しておくか、有効化後に`workflow_dispatch`で再実行すればよい
   - _Requirements: 9, 12_
 
-- [ ] 3. 🔴 コアデータモデルとConfigLoader/ConfigValidatorの実装（TDD）
+- [x] 3. ✅️ コアデータモデルとConfigLoader/ConfigValidatorの実装（TDD）
   - `LayerDefinition`, `PointOfInterest`, `MediaLink`, `ReferencePaper`, `TourConfig` 等のTypeScriptインターフェース定義（design.md Core Interfaces準拠）
   - `ConfigLoader.loadLayers()` / `loadTour()` / `listAvailableTours()` のテスト作成→実装
   - `ConfigValidator.validateLayerDefinition()` / `validateMediaLink()` / `validateReferencePaper()` / `validateTourConfig()` のテスト作成→実装（タイルURLの`{z}/{x}/{y}`検証、リンクURLの`http(s)://`検証を含む）
+  - 完了メモ: `src/types/config.ts`に型定義、`src/services/configValidator.ts`（単体テスト16件）、`src/services/configLoader.ts`（fetchモックによるテスト7件）を実装。全24テスト・lint・型チェック・buildすべて成功。リファクタリング観点で確認済み（重複なし、関数は単一責務）で追加変更不要と判断
   - _Requirements: 10, 4, 4.1, 4.2_
 
 - [ ] 4. 🔴 サンプル設定ファイルの作成
