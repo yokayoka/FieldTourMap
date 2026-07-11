@@ -165,9 +165,13 @@ Phase 1完了後、8観点（正誤性3・再利用/簡素化/効率3・altitude
 
 ## Phase 3: 高度な機能
 
-- [ ] 17. 🔴 パフォーマンス最適化とLighthouse CI導入
+- [x] 17. ✅️ パフォーマンス最適化とLighthouse CI導入
   - 大量POI（100件超）・複数オーバーレイレイヤー同時表示時の描画パフォーマンス計測と最適化
   - Lighthouse CIをGitHub Actionsに組み込み、初期表示3秒以内を継続的に計測
+  - 完了メモ: `e2e/performance.spec.ts`にPOI 150件（Requirement 7が想定する「100件超」規模）を機械生成して読み込ませるE2Eベンチマークを追加し、初期表示（150マーカー描画完了）が3秒以内であること・描画後もズーム操作等に反応し続けることを回帰テストとして固定した。実測は274ms〜474ms程度であり、`PoiRouteOverlay`は現状の素朴なLeaflet標準マーカー実装のままで十分な性能を持つと判断し、マーカークラスタリング等の追加ライブラリ導入は見送った（新規ライブラリ導入はCLAUDE.mdの合意原則に照らし、実測で必要性が確認できない限り行わない判断）
+  - Lighthouse CI（`@lhci/cli`をdevDependencyに追加）を導入し、`lighthouserc.json`で本番相当のビルド（`vite preview`、base path `/FieldTourMap/`込み）に対しLighthouseを実行するよう設定。`interactive`（3000ms以内）・`first-contentful-paint`（2000ms以内）・`categories:performance`（0.7以上）をアサーション対象とした
+  - 設計判断の確認: 地図タイルは国土地理院等の外部サーバーから取得するため、CI実行時の応答速度に計測値が左右される。ユーザーに確認の上、アサーションはすべて`warn`（非ブロッキング）とし、GitHub Actionsのワークフロー側でも`continue-on-error: true`を設定してLighthouse結果がデプロイをブロックしないようにした。レポートは`lighthouse-report`としてartifact保存し（30日保持）、継続的な傾向確認に用いる
+  - 既知の制約: ローカルのWindows開発環境では`chrome-launcher`起因と見られる`NO_FCP`/一時ディレクトリのアクセス権エラーが発生し、`npx lhci autorun`のローカル実行では動作確認できなかった（Playwright/Chromiumは同環境で正常動作するため、lhciのChrome起動方法に起因する環境固有の問題と判断）。実際の動作確認はGitHub Actions（Ubuntu）上のCI実行結果で行う
   - _Requirements: 7_
 
 - [ ] 18. 🔴 セキュリティ・プライバシーレビュー

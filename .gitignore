@@ -18,6 +18,10 @@ dist-ssr
 /blob-report/
 /playwright/.cache/
 
+# Lighthouse CI
+/.lighthouseci/
+/lighthouse-report/
+
 # Claude Code local harness state
 .claude/scheduled_tasks.lock
 

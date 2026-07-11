@@ -56,6 +56,21 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Lighthouse CI
+        # 外部タイル配信元（国土地理院等）への依存により計測値が変動しうるため、
+        # 基準未達でもデプロイはブロックしない（警告のみ）。レポートは
+        # artifactとして保存し、継続的な傾向確認に用いる（Requirement 7.1）。
+        run: npx lhci autorun --config=lighthouserc.json
+        continue-on-error: true
+
+      - name: Upload Lighthouse report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report
+          path: lighthouse-report/
+          retention-days: 30
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
