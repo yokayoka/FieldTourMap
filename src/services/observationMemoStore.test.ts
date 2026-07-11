@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ObservationMemoStore } from "./observationMemoStore";
 
 function createFakeStorage(): Storage {
@@ -79,6 +79,18 @@ describe("ObservationMemoStore", () => {
     expect(store.list()).toHaveLength(1);
   });
 
+  it("updates only the targeted memo when multiple memos exist", () => {
+    const { store } = createStore();
+    const memo1 = store.add({ position: { lat: 35.68, lng: 139.76 }, text: "メモ1" });
+    const memo2 = store.add({ position: { lat: 35.69, lng: 139.77 }, text: "メモ2" });
+
+    store.update(memo2.id, "メモ2（更新）");
+
+    const [updated1, updated2] = store.list();
+    expect(updated1).toEqual(memo1);
+    expect(updated2.text).toBe("メモ2（更新）");
+  });
+
   it("deletes a memo by id", () => {
     const { store } = createStore();
     const memo1 = store.add({ position: { lat: 35.68, lng: 139.76 }, text: "メモ1" });
@@ -97,6 +109,73 @@ describe("ObservationMemoStore", () => {
     const { store } = createStore({ storage });
 
     expect(store.list()).toEqual([]);
+  });
+
+  it("recovers gracefully when persisted content is valid JSON but not an array", () => {
+    const storage = createFakeStorage();
+    storage.setItem("fieldtour.memos.test", JSON.stringify({ not: "an array" }));
+
+    const { store } = createStore({ storage });
+
+    expect(store.list()).toEqual([]);
+  });
+
+  it("uses real localStorage and the default storage key when no options are given", () => {
+    localStorage.clear();
+    try {
+      const store = new ObservationMemoStore();
+      store.add({ position: { lat: 0, lng: 0 }, text: "デフォルト設定の確認" });
+
+      expect(localStorage.getItem("fieldtour.memos.v1")).toContain("デフォルト設定の確認");
+    } finally {
+      localStorage.clear();
+    }
+  });
+
+  it("does not throw when persisting fails (e.g. storage quota exceeded / private browsing)", () => {
+    const throwingStorage: Storage = {
+      ...createFakeStorage(),
+      setItem: () => {
+        throw new DOMException("QuotaExceededError");
+      },
+    };
+    const { store } = createStore({ storage: throwingStorage });
+
+    expect(() =>
+      store.add({ position: { lat: 35.68, lng: 139.76 }, text: "メモ" }),
+    ).not.toThrow();
+    expect(store.list()).toHaveLength(1);
+  });
+
+  describe("default id generation (no generateId override)", () => {
+    it("uses crypto.randomUUID when available", () => {
+      const store = new ObservationMemoStore({
+        storage: createFakeStorage(),
+        storageKey: "fieldtour.memos.test",
+      });
+
+      const memo = store.add({ position: { lat: 0, lng: 0 }, text: "x" });
+
+      expect(memo.id).toMatch(/^[0-9a-f-]{36}$/);
+    });
+
+    it("falls back to a timestamp/random id when crypto.randomUUID is unavailable", () => {
+      const originalCrypto = globalThis.crypto;
+      // @ts-expect-error -- randomUUID非対応環境をシミュレートするため意図的に削除する
+      delete globalThis.crypto;
+
+      try {
+        const store = new ObservationMemoStore({
+          storage: createFakeStorage(),
+          storageKey: "fieldtour.memos.test",
+        });
+        const memo = store.add({ position: { lat: 0, lng: 0 }, text: "x" });
+
+        expect(memo.id).toMatch(/^memo-\d+-[0-9a-f]+$/);
+      } finally {
+        vi.stubGlobal("crypto", originalCrypto);
+      }
+    });
   });
 
   describe("exportAsGeoJson", () => {

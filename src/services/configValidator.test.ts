@@ -61,6 +61,17 @@ describe("validateLayerDefinition", () => {
     expect(result.errors).toContain("minZoomはmaxZoom以下である必要があります");
   });
 
+  it("rejects a non-numeric minZoom/maxZoom instead of throwing", () => {
+    const malformed = {
+      ...validLayer,
+      minZoom: "2",
+      maxZoom: undefined,
+    } as unknown as LayerDefinition;
+    const result = validateLayerDefinition(malformed);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("minZoom/maxZoomは数値で指定してください");
+  });
+
   // configLoaderはfetchしたJSONを`as T`で無検査キャストしてから渡すため、
   // 実行時には型定義と一致しない（フィールド欠落・型不一致の）値が
   // 渡ってくる可能性がある。例外を投げず、妥当性エラーとして報告すること。
@@ -218,5 +229,23 @@ describe("validateTourConfig", () => {
     const malformed = { ...validTour, pois: undefined, routes: undefined } as unknown as TourConfig;
     expect(() => validateTourConfig(malformed)).not.toThrow();
     expect(validateTourConfig(malformed).valid).toBe(false);
+  });
+
+  it("collects a nested media link error with the POI and media index prefixed", () => {
+    const result = validateTourConfig({
+      ...validTour,
+      pois: [{ ...validTour.pois[0], media: [{ ...validMedia, url: "not-a-url" }] }],
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("pois[0].media[0]: urlはhttp(s)://で始まる必要があります");
+  });
+
+  it("collects a nested reference paper error with the POI and paper index prefixed", () => {
+    const result = validateTourConfig({
+      ...validTour,
+      pois: [{ ...validTour.pois[0], referencePapers: [{ ...validPaper, citation: "" }] }],
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("pois[0].referencePapers[0]: citationが空です");
   });
 });

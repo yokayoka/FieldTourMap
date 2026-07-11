@@ -185,4 +185,73 @@ describe("LayerManager", () => {
     expect(() => manager.setBaseLayer("osm")).not.toThrow();
     expect(manager.getActiveLayerState().baseLayerId).toBe("osm");
   });
+
+  it("falls back to defaults when the persisted value is not valid JSON", () => {
+    const storage = createFakeStorage();
+    storage.setItem("fieldtour.layerState.test", "{not valid json");
+
+    const { manager } = createManager({ storage });
+
+    expect(manager.getActiveLayerState()).toEqual({
+      baseLayerId: "gsi-std",
+      overlayLayerIds: [],
+    });
+  });
+
+  it("falls back to defaults when the persisted value has the wrong shape", () => {
+    const storage = createFakeStorage();
+    storage.setItem(
+      "fieldtour.layerState.test",
+      JSON.stringify({ baseLayerId: 123, overlayLayerIds: "not-an-array" }),
+    );
+
+    const { manager } = createManager({ storage });
+
+    expect(manager.getActiveLayerState()).toEqual({
+      baseLayerId: "gsi-std",
+      overlayLayerIds: [],
+    });
+  });
+
+  it("selects a default-visible overlay layer on construction", () => {
+    const map = createFakeMap();
+    const createLayer = vi.fn((definition: LayerDefinition) => ({ id: definition.id }) as never);
+    const layersWithDefaultOverlay: LayerDefinition[] = [
+      ...layers.slice(0, 2),
+      { ...layers[2], defaultVisible: true },
+    ];
+    const manager = new LayerManager({
+      map,
+      layers: layersWithDefaultOverlay,
+      createLayer,
+      storage: createFakeStorage(),
+      storageKey: "fieldtour.layerState.test",
+    });
+
+    expect(manager.getActiveLayerState().overlayLayerIds).toEqual(["aist-geology"]);
+  });
+
+  it("throws on construction when no base layer is defined", () => {
+    const map = createFakeMap();
+    const createLayer = vi.fn((definition: LayerDefinition) => ({ id: definition.id }) as never);
+    const overlayOnly = layers.filter((layer) => layer.type === "overlay");
+
+    expect(
+      () =>
+        new LayerManager({
+          map,
+          layers: overlayOnly,
+          createLayer,
+          storage: createFakeStorage(),
+        }),
+    ).toThrow(/base/);
+  });
+
+  it("is a no-op when toggling off an overlay that is not currently active", () => {
+    const { manager, map } = createManager();
+
+    expect(() => manager.toggleOverlay("aist-geology", false)).not.toThrow();
+    expect(manager.getActiveLayerState().overlayLayerIds).toEqual([]);
+    expect(map.removed).toHaveLength(0);
+  });
 });

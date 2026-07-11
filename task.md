@@ -206,9 +206,16 @@ Phase 1完了後、8観点（正誤性3・再利用/簡素化/効率3・altitude
 
 ## Phase 4: 本番化対応
 
-- [ ] 21. 🔴 自動テストカバレッジ拡充とCIゲート強化
+- [x] 21. ✅️ 自動テストカバレッジ拡充とCIゲート強化
   - 単体・結合・E2Eテストの主要機能網羅（GNSS、レイヤー切替、POI表示、共有リンク、Googleマップリンク、オフラインキャッシュ、観察メモ）
   - CIでのテスト失敗時のデプロイブロック確認
+  - 完了メモ: `@vitest/coverage-v8`を導入し`npm run test:coverage`でカバレッジ計測できるようにした（`vite.config.ts`の`test.coverage`に設定を追加、`main.ts`等のアプリ起動コードはdesign.mdのTesting Strategyに従いE2Eで検証する方針のため計測対象から除外）。導入時点でStatements 94.97%・Branches 83.43%だったところ、Requirement 9が名指しする7機能領域（GNSS/レイヤー切替/POI表示/共有リンク/Googleマップリンク/オフラインキャッシュ/観察メモ）を中心に未カバー箇所を精査し、テストを追加してStatements 97.9%・Branches 89.53%まで引き上げた
+  - 追加した主なテスト: `layerManager`（永続化データが不正JSON/型不一致の場合のフォールバック、baseレイヤー0件時のthrow、overlayのdefaultVisible適用、非アクティブなoverlayをtoggle offしてもno-opであること）、`observationMemoStore`（`crypto.randomUUID`非対応環境へのフォールバック、永続化失敗時に例外を投げないこと、永続化データが配列でない場合のフォールバック、複数メモがある場合に対象のメモのみ更新されること）、`configValidator`（`minZoom`/`maxZoom`が数値でない場合、ツアー内のメディア/参考文献リンクのネストしたエラーがPOI・要素インデックス付きで報告されること）、`geolocationService`（未知のエラーコードに対するデフォルトメッセージ）、`adminNav`（0%カバレッジだった管理ツールのページ間ナビゲーション）、`downloadTextFile`（0%カバレッジだったダウンロードユーティリティ）
+  - 回帰防止テストを追加: `offlineCacheService`のデフォルト`fetchFn`（グローバル`fetch`をアロー関数でラップした実装）が実際に`Illegal invocation`にならず動作することを検証するテストを追加した。Task 11で発見・修正した実バグの再発を単体テストレベルでも検知できるようにする目的
+  - 意図的にカバレッジ対象から除外・許容した箇所: (1) `layerManager.defaultCreateLayer`/`poiRouteOverlay.defaultCreateMarker`/`defaultCreatePolyline`等、単体テストでは常にフェイクへ差し替えて検証しているデフォルトのLeaflet連携実装。design.mdのTesting Strategy通りPlaywright E2E（実際にタイル/マーカーが描画されることを検証済み）で担保する方針を踏襲した。(2) `typeof navigator/caches/location !== "undefined"`等の非ブラウザ環境向けフォールバック分岐（`clipboard.ts`, `shareLinkService.ts`, `offlineCacheService.ts`）。本アプリはブラウザ専用のクライアントサイドSPAであり、jsdom環境下では常にtrueとなるためテストする実益が低いと判断した
+  - CIゲートの確認（Requirement 9.3）: `.github/workflows/deploy.yml`を再確認し、`Lint`/`Type check`/`Test`/`E2E test`の各ステップに`continue-on-error`が設定されておらずbuildジョブの失敗として扱われること、`deploy`ジョブが`needs: build`によりbuildジョブ成功後にのみ実行されることを静的に確認した（Lighthouse CIステップのみTask 17でユーザー確認済みの方針により意図的に`continue-on-error: true`）
+  - Requirement 9.4（型定義・ドキュメントコメントによる保守性）は、プロジェクト全体でTypeScript strictモード・全公開APIへのinterface定義を徹底する既存方針により継続的に満たされていることを確認した
+  - 単体テスト260件→282件、E2Eテスト41件（変更なし）、lint・型チェック・buildすべて成功
   - _Requirements: 9_
 
 - [ ] 22. 🔴 運用ドキュメント整備

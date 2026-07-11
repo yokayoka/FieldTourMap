@@ -26,6 +26,30 @@ function createFakeCachesApi(entries: string[] = []): CacheStorage {
 }
 
 describe("OfflineCacheService", () => {
+  it("falls back to real browser globals (navigator.serviceWorker, caches, fetch) when no options are given", () => {
+    expect(() => new OfflineCacheService()).not.toThrow();
+  });
+
+  it("regression: the default fetchFn calls the native fetch without 'Illegal invocation' (Task 11)", async () => {
+    // ネイティブfetchをメソッド呼び出し(this.fetchFn(url))すると
+    // "Illegal invocation"になっていた過去の不具合の再発防止テスト。
+    // アロー関数でラップすることで解消している（constructorのコメント参照）。
+    const fetchMock = vi.fn().mockResolvedValue(new Response("tile"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const service = new OfflineCacheService();
+    await service.precacheArea({
+      bounds: { north: 35.01, south: 35.0, east: 139.01, west: 139.0 },
+      zoomLevels: [10],
+      urlTemplates: ["https://example.com/{z}/{x}/{y}.png"],
+    });
+
+    expect(fetchMock).toHaveBeenCalled();
+    expect(fetchMock.mock.calls[0][0]).toMatch(/^https:\/\/example\.com\/10\//);
+
+    vi.unstubAllGlobals();
+  });
+
   it("registers the service worker with the configured script URL", async () => {
     const container = createFakeContainer();
     const service = new OfflineCacheService({ serviceWorkerContainer: container, swUrl: "sw.js" });

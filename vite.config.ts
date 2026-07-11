@@ -25,5 +25,20 @@ export default defineConfig(({ command }) => ({
   test: {
     environment: "jsdom",
     include: ["src/**/*.test.ts", "admin-tool/src/**/*.test.ts"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html"],
+      include: ["src/**/*.ts", "admin-tool/src/**/*.ts"],
+      exclude: [
+        "**/*.test.ts",
+        "src/types/**",
+        // main.ts / tourEditorMain.tsはLeaflet地図・DOM全体の配線を担う
+        // アプリ起動コードで、design.mdのTesting Strategyに従いPlaywright
+        // E2Eで検証する（単体テストのモック化コストに見合わないため）。
+        "src/main.ts",
+        "admin-tool/src/main.ts",
+        "admin-tool/src/tourEditorMain.ts",
+      ],
+    },
   },
 }));

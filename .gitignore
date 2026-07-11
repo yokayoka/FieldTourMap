@@ -22,6 +22,9 @@ dist-ssr
 /.lighthouseci/
 /lighthouse-report/
 
+# Vitest coverage
+/coverage/
+
 # Claude Code local harness state
 .claude/scheduled_tasks.lock
 

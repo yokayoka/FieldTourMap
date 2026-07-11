@@ -132,6 +132,7 @@ describe("GeolocationService", () => {
     [1, /許可/],
     [2, /取得できません/],
     [3, /タイムアウト/],
+    [99, /不明なエラー/],
   ])("maps geolocation error code %i to a Japanese message matching %s", (code, pattern) => {
     const geolocation = createFakeGeolocation();
     const orientationTarget = createFakeOrientationTarget();
