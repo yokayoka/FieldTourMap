@@ -112,8 +112,11 @@ export class GoogleSheetsProjectService {
 
   constructor(options: GoogleSheetsProjectServiceOptions = {}) {
     this.loadGis = options.loadGis ?? defaultLoadGis;
-    this.sheetsApi =
-      options.sheetsApi ?? defaultSheetsApi(() => this.accessToken, options.fetchFn ?? fetch);
+    // ネイティブfetchはwindowにバインドされていないと"Illegal invocation"に
+    // なりうるため、アロー関数でラップする（Task 11・PublicSheetProjectLoader
+    // と同じ既知の不具合パターンへの予防的対応）。
+    const fetchFn = options.fetchFn ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
+    this.sheetsApi = options.sheetsApi ?? defaultSheetsApi(() => this.accessToken, fetchFn);
   }
 
   isAuthorized(): boolean {

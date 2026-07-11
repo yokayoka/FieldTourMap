@@ -2,7 +2,7 @@ import "leaflet/dist/leaflet.css";
 import "./style.css";
 import L from "leaflet";
 import { loadLayers, loadTour, listAvailableTours } from "./services/configLoader";
-import { LayerManager } from "./services/layerManager";
+import { LayerManager, DEFAULT_STORAGE_KEY as LAYER_STORAGE_KEY } from "./services/layerManager";
 import { createLayerControl, type LayerControl } from "./components/layerControl";
 import { GeolocationService, type GeolocationUpdate } from "./services/geolocationService";
 import { createLocationControl } from "./components/locationControl";
@@ -10,7 +10,10 @@ import { PoiRouteOverlay } from "./services/poiRouteOverlay";
 import { createPoiDetailPanel } from "./components/poiDetailPanel";
 import { OfflineCacheService } from "./services/offlineCacheService";
 import { createPrecacheControl } from "./components/precacheControl";
-import { ObservationMemoStore } from "./services/observationMemoStore";
+import {
+  ObservationMemoStore,
+  DEFAULT_STORAGE_KEY as MEMO_STORAGE_KEY,
+} from "./services/observationMemoStore";
 import { createMemoPanel } from "./components/memoPanel";
 import { createMemoControl } from "./components/memoControl";
 import { createTourSelectorControl } from "./components/tourSelectorControl";
@@ -28,6 +31,15 @@ import { showToast } from "./components/toast";
 // 初期表示位置は現在地取得（Requirement 1）が成功するまでの暫定フォールバック。
 const DEFAULT_CENTER: L.LatLngExpression = [35.681236, 139.767125];
 const DEFAULT_ZOOM = 15;
+
+/**
+ * 同一ブラウザで異なるproject（またはproject未指定の既定サイト）を閲覧した
+ * 際に、観察メモ・レイヤー選択・ツアー選択が混在しないようにする
+ * （Requirement 16.9）。project未指定時は空文字列（既存キーのまま）。
+ */
+function projectStorageKeySuffix(projectId: string | undefined): string {
+  return projectId ? `.project.${projectId}` : "";
+}
 
 export function mountApp(root: HTMLElement): void {
   const mapContainer = document.createElement("div");
@@ -182,6 +194,7 @@ function setupShareControl(
   topControls: HTMLElement,
   shareLinkService: ShareLinkService,
   fallbackPanel: LinkFallbackPanel,
+  projectId: string | undefined,
 ): void {
   const control = createShareControl({
     onShare: async () => {
@@ -198,6 +211,7 @@ function setupShareControl(
         overlayLayerIds: layerState.overlayLayerIds,
         ...(poiId ? { poiId } : {}),
         ...(tourId ? { tourId } : {}),
+        ...(projectId ? { projectId } : {}),
       });
 
       if (await shareLinkService.shareViaWebShareApi(url)) {
@@ -275,8 +289,13 @@ function createMemoIcon(): L.DivIcon {
   });
 }
 
-function setupObservationMemos(map: L.Map, root: HTMLElement, bottomControls: HTMLElement): void {
-  const store = new ObservationMemoStore();
+function setupObservationMemos(
+  map: L.Map,
+  root: HTMLElement,
+  bottomControls: HTMLElement,
+  storageKeySuffix: string,
+): void {
+  const store = new ObservationMemoStore({ storageKey: MEMO_STORAGE_KEY + storageKeySuffix });
   let memoMarkers: L.Marker[] = [];
   let placementActive = false;
 
@@ -363,10 +382,13 @@ async function setupTourSwitching(
   layerControl: LayerControl,
   requestGoogleMapsLink: (point: LatLng) => Promise<void>,
   initial: TourSwitchingInitialState,
+  projectId: string | undefined,
 ): Promise<TourSwitchingHandle> {
+  const storageKeySuffix = projectStorageKeySuffix(projectId);
+
   let availableTours: { id: string; title: string }[] = [];
   try {
-    availableTours = await listAvailableTours();
+    availableTours = await listAvailableTours(projectId);
   } catch (error) {
     console.warn("ツアー一覧の取得に失敗しました", error);
   }
@@ -418,7 +440,7 @@ async function setupTourSwitching(
   ): Promise<void> {
     let tour;
     try {
-      tour = await loadTour(tourId);
+      tour = await loadTour(tourId, projectId);
     } catch (error) {
       console.warn(`ツアー "${tourId}" の読み込みに失敗しました`, error);
       return;
@@ -427,7 +449,7 @@ async function setupTourSwitching(
     currentTourId = tourId;
     overlay.renderTour(tour);
     selectorControl.setTitle(tour.title);
-    writeSelectedTourId(window.localStorage, tourId);
+    writeSelectedTourId(window.localStorage, tourId, storageKeySuffix);
 
     // ツアーのlayerIdsから初期値を提案する（レイヤーパネル自体は全レイヤー
     // を引き続き表示し、ユーザーは自由に他レイヤーへ切り替えられる）。
@@ -459,7 +481,7 @@ async function setupTourSwitching(
     }
   }
 
-  const persistedTourId = readSelectedTourId(window.localStorage);
+  const persistedTourId = readSelectedTourId(window.localStorage, storageKeySuffix);
   const isKnownTour = (id: string | null): id is string =>
     id !== null && availableTours.some((tour) => tour.id === id);
   // 共有URLで指定されたツアー（Requirement 13）を最優先とし、次に
@@ -493,7 +515,13 @@ async function setupTourSwitching(
   };
 }
 
-export async function initializeMap(root: HTMLElement, mapContainer: HTMLElement): Promise<void> {
+export async function initializeMap(
+  root: HTMLElement,
+  mapContainer: HTMLElement,
+  projectId?: string,
+): Promise<void> {
+  const storageKeySuffix = projectStorageKeySuffix(projectId);
+
   // 共有URL（Requirement 13）にビュー状態が含まれていれば復元する。
   // 不正・破損したURLの場合はdecode()がnullを返し、通常の初期表示に
   // フォールバックする（Requirement 13.7）。
@@ -528,12 +556,20 @@ export async function initializeMap(root: HTMLElement, mapContainer: HTMLElement
 
   setupLocationTracking(map, bottomControls);
 
-  const layers = await loadLayers();
-  const layerManager = new LayerManager({ map, layers, storage: window.localStorage });
+  // projectIdが指定されている場合は認証なしの公開スプレッドシート読み込み
+  // （Requirement 16）へ、指定されない場合は従来通り静的JSON設定ファイルへ
+  // 委譲する（ConfigLoader内部で分岐）。
+  const layers = await loadLayers(projectId);
+  const layerManager = new LayerManager({
+    map,
+    layers,
+    storage: window.localStorage,
+    storageKey: LAYER_STORAGE_KEY + storageKeySuffix,
+  });
   const layerControl = createLayerControl(layers, layerManager);
   bottomControls.appendChild(layerControl.root);
   setupPrecacheControl(map, layerManager, layers, layerControl.root, offlineCacheService);
-  setupObservationMemos(map, root, bottomControls);
+  setupObservationMemos(map, root, bottomControls, storageKeySuffix);
 
   // クリップボードAPI等が使えない/失敗した環境向けの手動コピー用UI
   // （Requirement 14.6）。共有機能・Googleマップリンク取得機能で共用する。
@@ -560,6 +596,7 @@ export async function initializeMap(root: HTMLElement, mapContainer: HTMLElement
         ? { baseLayerId: sharedState.baseLayerId, overlayLayerIds: sharedState.overlayLayerIds }
         : undefined,
     },
+    projectId,
   );
 
   setupShareControl(
@@ -570,6 +607,7 @@ export async function initializeMap(root: HTMLElement, mapContainer: HTMLElement
     topControls,
     shareLinkService,
     fallbackPanel,
+    projectId,
   );
 }
 
@@ -578,11 +616,17 @@ if (appRoot) {
   mountApp(appRoot);
   const mapContainer = appRoot.querySelector<HTMLDivElement>("#map");
   if (mapContainer) {
-    initializeMap(appRoot, mapContainer).catch((error: unknown) => {
+    // URLの`project`パラメータで、認証なしの公開スプレッドシート読み込み
+    // （Requirement 16）へ切り替える。指定されない場合は既存の静的JSON
+    // 設定ファイルを読み込む従来通りの動作。
+    const projectId = new URLSearchParams(location.search).get("project") ?? undefined;
+    initializeMap(appRoot, mapContainer, projectId).catch((error: unknown) => {
       console.error("アプリの初期化に失敗しました", error);
       showFatalError(
         appRoot,
-        "アプリの初期化に失敗しました。しばらくしてから再度お試しください。",
+        projectId
+          ? "プロジェクトの読み込みに失敗しました。URLのproject指定や、スプレッドシートが「ウェブに公開」されているかを確認してください。"
+          : "アプリの初期化に失敗しました。しばらくしてから再度お試しください。",
       );
     });
   }

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadLayers, loadTour, listAvailableTours } from "./configLoader";
+import { PublicSheetProjectLoader } from "./publicSheetProjectLoader";
 import type { LayerDefinition, TourConfig } from "../types/config";
 
 const sampleLayers: LayerDefinition[] = [
@@ -95,6 +96,63 @@ describe("listAvailableTours", () => {
     const tours = await listAvailableTours();
 
     expect(fetch).toHaveBeenCalledWith("config/tours/index.json");
+    expect(tours).toEqual(index);
+  });
+});
+
+describe("project parameter routing (Requirement 16)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("loadLayers delegates to PublicSheetProjectLoader when a projectId is given, and still validates the result", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const loadSpy = vi
+      .spyOn(PublicSheetProjectLoader.prototype, "loadLayers")
+      .mockResolvedValue(sampleLayers);
+
+    const layers = await loadLayers("sheet-id");
+
+    expect(loadSpy).toHaveBeenCalledWith("sheet-id");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(layers).toEqual(sampleLayers);
+  });
+
+  it("loadLayers rejects when the project's layer data fails validation", async () => {
+    vi.spyOn(PublicSheetProjectLoader.prototype, "loadLayers").mockResolvedValue([
+      { ...sampleLayers[0], id: "" },
+    ]);
+
+    await expect(loadLayers("sheet-id")).rejects.toThrow(/idが空です/);
+  });
+
+  it("loadTour delegates to PublicSheetProjectLoader when a projectId is given", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const loadSpy = vi
+      .spyOn(PublicSheetProjectLoader.prototype, "loadTour")
+      .mockResolvedValue(sampleTour);
+
+    const tour = await loadTour("sample-tour", "sheet-id");
+
+    expect(loadSpy).toHaveBeenCalledWith("sheet-id", "sample-tour");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(tour).toEqual(sampleTour);
+  });
+
+  it("listAvailableTours delegates to PublicSheetProjectLoader when a projectId is given", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const index = [{ id: "sample-tour", title: "サンプル巡検" }];
+    const listSpy = vi
+      .spyOn(PublicSheetProjectLoader.prototype, "listAvailableTours")
+      .mockResolvedValue(index);
+
+    const tours = await listAvailableTours("sheet-id");
+
+    expect(listSpy).toHaveBeenCalledWith("sheet-id");
+    expect(fetchSpy).not.toHaveBeenCalled();
     expect(tours).toEqual(index);
   });
 });

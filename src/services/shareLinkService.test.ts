@@ -55,6 +55,22 @@ describe("ShareLinkService", () => {
       expect(decoded).toEqual(state);
     });
 
+    it("round-trips a projectId when present (Requirement 16.8)", () => {
+      const service = new ShareLinkService({ baseUrl: BASE_URL });
+      const state: ShareViewState = {
+        lat: 35.68,
+        lng: 139.76,
+        zoom: 16,
+        baseLayerId: "gsi-std",
+        overlayLayerIds: [],
+        projectId: "1AbCdEf-spreadsheet-id",
+      };
+
+      const decoded = service.decode(service.encode(state));
+
+      expect(decoded).toEqual(state);
+    });
+
     it("produces a URL rooted at the configured base URL", () => {
       const service = new ShareLinkService({ baseUrl: BASE_URL });
       const url = service.encode({

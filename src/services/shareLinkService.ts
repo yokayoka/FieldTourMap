@@ -56,6 +56,9 @@ export class ShareLinkService {
     if (state.tourId) {
       params.set("tour", state.tourId);
     }
+    if (state.projectId) {
+      params.set("project", state.projectId);
+    }
 
     const separator = this.baseUrl.includes("?") ? "&" : "?";
     return `${this.baseUrl}${separator}${params.toString()}`;
@@ -96,6 +99,7 @@ export class ShareLinkService {
     const overlayLayerIds = overlayParam ? overlayParam.split(",").filter((id) => id !== "") : [];
     const poiId = params.get("poi") ?? undefined;
     const tourId = params.get("tour") ?? undefined;
+    const projectId = params.get("project") ?? undefined;
 
     return {
       lat,
@@ -105,6 +109,7 @@ export class ShareLinkService {
       overlayLayerIds,
       ...(poiId ? { poiId } : {}),
       ...(tourId ? { tourId } : {}),
+      ...(projectId ? { projectId } : {}),
     };
   }
 

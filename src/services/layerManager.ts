@@ -19,7 +19,7 @@ export interface LayerManagerOptions {
   storageKey?: string;
 }
 
-const DEFAULT_STORAGE_KEY = "fieldtour.layerState.v1";
+export const DEFAULT_STORAGE_KEY = "fieldtour.layerState.v1";
 
 function defaultCreateLayer(definition: LayerDefinition): L.Layer {
   const layer = L.tileLayer(definition.urlTemplate, {

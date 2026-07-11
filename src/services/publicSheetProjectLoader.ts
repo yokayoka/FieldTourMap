@@ -27,7 +27,10 @@ export class PublicSheetProjectLoader {
   private readonly fetchFn: typeof fetch;
 
   constructor(options: PublicSheetProjectLoaderOptions = {}) {
-    this.fetchFn = options.fetchFn ?? fetch;
+    // ネイティブfetchはwindowにバインドされていないとメソッド呼び出し
+    // （this.fetchFn(url)）で"Illegal invocation"になるため、アロー関数で
+    // ラップする（Task 11のOfflineCacheServiceと同じ既知の不具合パターン）。
+    this.fetchFn = options.fetchFn ?? ((...args) => fetch(...args));
   }
 
   private async fetchSheet(spreadsheetId: string, sheetName: string): Promise<string[][]> {

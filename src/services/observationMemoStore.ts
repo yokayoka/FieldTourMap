@@ -12,7 +12,7 @@ export interface AddMemoInput {
   text: string;
 }
 
-const DEFAULT_STORAGE_KEY = "fieldtour.memos.v1";
+export const DEFAULT_STORAGE_KEY = "fieldtour.memos.v1";
 
 function defaultGenerateId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
