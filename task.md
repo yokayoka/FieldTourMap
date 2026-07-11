@@ -45,10 +45,12 @@
   - CSSで`.layer-control__button`/`.layer-control__checkbox-label`に44px以上のタップ領域、画面下部固定配置を実装（Requirement 6.2, 6.4）
   - _Requirements: 2, 6_
 
-- [ ] 6. 🔴 GeolocationServiceと現在地表示の実装
+- [x] 6. ✅️ GeolocationServiceと現在地表示の実装
   - `watchPosition`によるテスト作成→実装、測位精度円の表示、方位（DeviceOrientation）表示
   - 位置情報許可拒否・取得失敗時のエラーメッセージ表示とフォールバック（地図閲覧は継続）
   - 追従表示（自動センタリング）のON/OFF切替
+  - 完了メモ: `GeolocationService`は`GeolocationApiLike`/`OrientationTargetLike`インターフェース越しに依存させ、フェイクでTDD（12テスト。webkitCompassHeading優先、absolute alphaからの方位算出、エラーコード別メッセージ、unsupported時の即時エラー等を網羅）。`locationControl`は追従トグル・エラーバナー表示のDOM純粋コンポーネント（5テスト）。`main.ts`にLeafletマーカー（方位矢印付きdivIcon）・精度円・追従時automatic centeringを統合
+  - 発見した不具合と修正: コンストラクタで`options.geolocation`未指定時に`navigator.geolocation`へフォールバックする実装が漏れており、実ブラウザでは常に「未対応」エラーになっていた。単体テストは常にフェイクを注入していたため検出できず、Playwrightでの実ブラウザ確認（許可あり/拒否の2ケース、スクリーンショット付き）で発見・修正し、回帰テストを追加した
   - _Requirements: 1_
 
 - [ ] 7. 🔴 POIRouteOverlayとPOI詳細パネルの実装

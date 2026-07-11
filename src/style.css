@@ -64,3 +64,67 @@ body,
   width: 22px;
   height: 22px;
 }
+
+/* 現在地ボタンは片手の親指で届く画面右下に配置する（Requirement 6.2） */
+.location-control {
+  position: fixed;
+  right: 8px;
+  bottom: 220px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.location-control__button {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 50%;
+  border: 1px solid #333;
+  background: #fff;
+  color: #111;
+  font-size: 12px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+}
+
+.location-control__button--active {
+  background: #1a5fb4;
+  border-color: #1a5fb4;
+  color: #fff;
+}
+
+.location-control__error {
+  max-width: 220px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #b3261e;
+  color: #fff;
+  font-size: 12px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+}
+
+.location-marker {
+  position: relative;
+}
+
+.location-marker__dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #1a5fb4;
+  border: 2px solid #fff;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+}
+
+.location-marker__arrow {
+  position: absolute;
+  top: -8px;
+  left: 4px;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 8px solid #1a5fb4;
+  transform-origin: 8px 16px;
+}
