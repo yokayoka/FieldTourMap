@@ -72,4 +72,91 @@ describe("OfflineCacheService", () => {
 
     await expect(service.isTileCached("https://example.com/tile/1/2/3.png")).resolves.toBe(false);
   });
+
+  describe("precacheArea", () => {
+    // 単一タイルとなるよう、zoom 0（世界全体が1タイル）を使う。
+    const WORLD_BOUNDS = { north: 45, south: -45, east: 170, west: -170 };
+
+    it("fetches every tile url across the given zoom levels and templates", async () => {
+      const fetchFn = vi.fn().mockResolvedValue(new Response("tile"));
+      const service = new OfflineCacheService({ fetchFn });
+
+      await service.precacheArea({
+        bounds: WORLD_BOUNDS,
+        zoomLevels: [0],
+        urlTemplates: ["https://a.example/{z}/{x}/{y}.png", "https://b.example/{z}/{x}/{y}.png"],
+      });
+
+      expect(fetchFn).toHaveBeenCalledWith("https://a.example/0/0/0.png");
+      expect(fetchFn).toHaveBeenCalledWith("https://b.example/0/0/0.png");
+      expect(fetchFn).toHaveBeenCalledTimes(2);
+    });
+
+    it("reports progress from 0 up to the total tile count", async () => {
+      const fetchFn = vi.fn().mockResolvedValue(new Response("tile"));
+      const service = new OfflineCacheService({ fetchFn });
+      const onProgress = vi.fn();
+
+      await service.precacheArea({
+        bounds: WORLD_BOUNDS,
+        zoomLevels: [0],
+        urlTemplates: ["https://a.example/{z}/{x}/{y}.png"],
+        onProgress,
+      });
+
+      expect(onProgress).toHaveBeenCalledWith({ completed: 0, total: 1 });
+      expect(onProgress).toHaveBeenLastCalledWith({ completed: 1, total: 1 });
+    });
+
+    it("continues precaching remaining tiles when one tile fetch fails", async () => {
+      const fetchFn = vi
+        .fn()
+        .mockResolvedValueOnce(new Response("tile"))
+        .mockRejectedValueOnce(new Error("network error"))
+        .mockResolvedValueOnce(new Response("tile"));
+      const service = new OfflineCacheService({ fetchFn });
+      const onProgress = vi.fn();
+
+      // zoom 0（世界全体が1タイル）× 3テンプレートで、確実に3件のURLにする。
+      await expect(
+        service.precacheArea({
+          bounds: WORLD_BOUNDS,
+          zoomLevels: [0],
+          urlTemplates: [
+            "https://a.example/{z}/{x}/{y}.png",
+            "https://b.example/{z}/{x}/{y}.png",
+            "https://c.example/{z}/{x}/{y}.png",
+          ],
+          onProgress,
+          concurrency: 1,
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(fetchFn).toHaveBeenCalledTimes(3);
+      expect(onProgress).toHaveBeenLastCalledWith({ completed: 3, total: 3 });
+    });
+
+    it("limits the number of concurrent tile fetches in flight", async () => {
+      let active = 0;
+      let maxActive = 0;
+      const fetchFn = vi.fn(async () => {
+        active++;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        active--;
+        return new Response("tile");
+      });
+      const service = new OfflineCacheService({ fetchFn });
+
+      await service.precacheArea({
+        bounds: { north: 10, south: -10, east: 10, west: -10 },
+        zoomLevels: [4],
+        urlTemplates: ["https://a.example/{z}/{x}/{y}.png"],
+        concurrency: 2,
+      });
+
+      expect(maxActive).toBeLessThanOrEqual(2);
+      expect(fetchFn.mock.calls.length).toBeGreaterThan(2);
+    });
+  });
 });

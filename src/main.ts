@@ -9,6 +9,8 @@ import { createLocationControl } from "./components/locationControl";
 import { PoiRouteOverlay } from "./services/poiRouteOverlay";
 import { createPoiDetailPanel } from "./components/poiDetailPanel";
 import { OfflineCacheService } from "./services/offlineCacheService";
+import { createPrecacheControl } from "./components/precacheControl";
+import type { LayerDefinition } from "./types/config";
 
 // 初期表示位置は現在地取得（Requirement 1）が成功するまでの暫定フォールバック。
 const DEFAULT_CENTER: L.LatLngExpression = [35.681236, 139.767125];
@@ -88,6 +90,74 @@ function setupLocationTracking(map: L.Map, bottomControls: HTMLElement): void {
   });
 }
 
+// 現在のズームから何段階分ズームインした範囲まで事前ダウンロードするか
+// （Requirement 3.4）。広範囲・高倍率になり過ぎないよう小さめに抑える。
+const PRECACHE_ZOOM_STEPS = 2;
+
+function setupPrecacheControl(
+  map: L.Map,
+  layerManager: LayerManager,
+  layers: LayerDefinition[],
+  layerControlEl: HTMLElement,
+  offlineCacheService: OfflineCacheService,
+): void {
+  const control = createPrecacheControl({
+    onStart: () => void runPrecache(),
+  });
+  layerControlEl.appendChild(control.root);
+
+  async function runPrecache(): Promise<void> {
+    control.setError(null);
+
+    const state = layerManager.getActiveLayerState();
+    const activeLayerIds = [state.baseLayerId, ...state.overlayLayerIds];
+    const activeLayers = layers.filter((layer) => activeLayerIds.includes(layer.id));
+
+    const bounds = map.getBounds();
+    const tileBounds = {
+      north: bounds.getNorth(),
+      south: bounds.getSouth(),
+      east: bounds.getEast(),
+      west: bounds.getWest(),
+    };
+    const baseZoom = map.getZoom();
+
+    // レイヤーをまたいだ進捗を合算して表示する。
+    const completedByLayer = new Map<string, number>();
+    const totalByLayer = new Map<string, number>();
+    const reportAggregateProgress = (): void => {
+      const completed = Array.from(completedByLayer.values()).reduce((a, b) => a + b, 0);
+      const total = Array.from(totalByLayer.values()).reduce((a, b) => a + b, 0);
+      control.setProgress({ completed, total });
+    };
+
+    try {
+      for (const layer of activeLayers) {
+        const zoomLevels = Array.from(
+          { length: PRECACHE_ZOOM_STEPS + 1 },
+          (_, i) => baseZoom + i,
+        ).filter((zoom) => zoom >= layer.minZoom && zoom <= layer.maxZoom);
+        if (zoomLevels.length === 0) continue;
+
+        await offlineCacheService.precacheArea({
+          bounds: tileBounds,
+          zoomLevels,
+          urlTemplates: [layer.urlTemplate],
+          onProgress: (progress) => {
+            completedByLayer.set(layer.id, progress.completed);
+            totalByLayer.set(layer.id, progress.total);
+            reportAggregateProgress();
+          },
+        });
+      }
+    } catch (error) {
+      console.error("事前ダウンロードに失敗しました", error);
+      control.setError("事前ダウンロードに失敗しました。もう一度お試しください。");
+      control.setProgress(null);
+    }
+  }
+}
+
 async function setupPoiOverlay(map: L.Map, root: HTMLElement): Promise<void> {
   let tour;
   try {
@@ -120,7 +190,10 @@ async function setupPoiOverlay(map: L.Map, root: HTMLElement): Promise<void> {
 
 export async function initializeMap(root: HTMLElement, mapContainer: HTMLElement): Promise<void> {
   // タイルキャッシュの登録は地図表示をブロックしない（Requirement 3）。
-  void new OfflineCacheService({ swUrl: `${import.meta.env.BASE_URL}sw.js` }).register();
+  const offlineCacheService = new OfflineCacheService({
+    swUrl: `${import.meta.env.BASE_URL}sw.js`,
+  });
+  void offlineCacheService.register();
 
   const map = L.map(mapContainer).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
@@ -136,6 +209,7 @@ export async function initializeMap(root: HTMLElement, mapContainer: HTMLElement
   const layerManager = new LayerManager({ map, layers, storage: window.localStorage });
   const layerControl = createLayerControl(layers, layerManager);
   bottomControls.appendChild(layerControl);
+  setupPrecacheControl(map, layerManager, layers, layerControl, offlineCacheService);
 
   await setupPoiOverlay(map, root);
 }

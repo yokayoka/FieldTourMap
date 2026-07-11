@@ -106,9 +106,12 @@ Phase 1完了後、8観点（正誤性3・再利用/簡素化/効率3・altitude
   - Playwrightで確認: SW登録・活性化、タイルキャッシュへの格納（Cache API直接検査）、オフライン時の未キャッシュタイルへのグレーアウト表示適用とアプリ非クラッシュ
   - _Requirements: 3_
 
-- [ ] 11. 🔴 想定エリアの一括プリキャッシュ機能
+- [x] 11. ✅️ 想定エリアの一括プリキャッシュ機能
   - `OfflineCacheService.precacheArea()` のテスト作成→実装
   - 主催者向け（または管理ツール向け）エリア選択UIとダウンロード進捗表示
+  - 完了メモ: `src/utils/tileMath.ts`に標準的なWeb Mercatorタイル座標変換（`lngLatToTile`/`getTileCoordsForBounds`/`buildTileUrl`）を実装（11テスト）。`OfflineCacheService.precacheArea()`は同時実行数制限付きのタイルURL取得ループとしてTDD実装（10テスト、個別タイル失敗時も継続）。取得したレスポンスはService Worker（Task 10）が自動キャッシュするため、precacheArea自体はfetch発行のみで完結する設計とした。`precacheControl`（進捗・完了・エラー表示のDOM純粋コンポーネント、6テスト）をレイヤーパネル内に配置し、現在の地図表示範囲・アクティブレイヤー・現在ズーム+2段階を対象にプリキャッシュする
+  - 重大な不具合を2件発見・修正: (1) `this.fetchFn(url)`というメソッド呼び出し形でネイティブ`fetch`を呼ぶと`Illegal invocation`エラーになる（`fetch`はwindowにバインドされていないと動作しない）。アロー関数でラップして解消。(2) 両方とも単体テストでは検出できず、実際にボタン操作からタイル取得までを通すE2Eテストで発見した。単体テストは常にフェイクの`fetchFn`を注入していたため、デフォルト実装のバグが見えていなかった
+  - Playwrightで確認: ボタン押下→進捗表示→完了表示（ボタン再有効化）、Cache API検証でプリキャッシュ後にタイル数が実際に増加することを確認
   - _Requirements: 3_
 
 - [ ] 12. 🔴 観察メモ機能の実装
