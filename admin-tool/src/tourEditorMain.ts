@@ -6,9 +6,14 @@ import { createPoiEditorForm } from "./components/poiEditorForm";
 import { createRouteEditorForm } from "./components/routeEditorForm";
 import { createSimpleListView } from "./components/simpleListView";
 import { createAdminNav } from "./components/adminNav";
+import { createGoogleSheetsPanel } from "./components/googleSheetsPanel";
+import { GoogleSheetsProjectService } from "./services/googleSheetsProjectService";
 import { downloadTextFile } from "../../src/utils/downloadTextFile";
 import { validateTourConfig } from "../../src/services/configValidator";
 import type { LatLng, PointOfInterest, RoutePath, TourConfig } from "../../src/types/config";
+
+const GOOGLE_SHEETS_CLIENT_ID_KEY = "fieldtour-admin.googleSheets.clientId";
+const GOOGLE_SHEETS_SPREADSHEET_ID_KEY = "fieldtour-admin.googleSheets.spreadsheetId";
 
 const DEFAULT_CENTER: L.LatLngExpression = [35.681236, 139.767125];
 const DEFAULT_ZOOM = 15;
@@ -30,6 +35,7 @@ interface Layout {
   routeListSection: HTMLElement;
   formColumn: HTMLElement;
   mapContainer: HTMLElement;
+  googleSheetsSection: HTMLElement;
 }
 
 function buildLayout(root: HTMLElement): Layout {
@@ -116,7 +122,20 @@ function buildLayout(root: HTMLElement): Layout {
   mapContainer.id = "tour-preview-map";
   mapContainer.className = "admin-preview-map";
 
-  root.append(nav, heading, toolbar, metadataForm, statusText, mapToolbar, main, mapContainer);
+  const googleSheetsSection = document.createElement("section");
+  googleSheetsSection.className = "admin-google-sheets-section";
+
+  root.append(
+    nav,
+    heading,
+    toolbar,
+    metadataForm,
+    statusText,
+    mapToolbar,
+    main,
+    mapContainer,
+    googleSheetsSection,
+  );
 
   return {
     loadInput,
@@ -132,6 +151,7 @@ function buildLayout(root: HTMLElement): Layout {
     routeListSection,
     formColumn,
     mapContainer,
+    googleSheetsSection,
   };
 }
 
@@ -335,6 +355,96 @@ async function main(): Promise<void> {
       }
     })();
   });
+
+  // Googleスプレッドシート連携（Requirement 15）。「ツアーID」欄の値を
+  // 対象ツアーとして保存/読み込みする。1枚のスプレッドシートに複数の
+  // ツアーが含まれていても、saveTourは対象ツアー分の行のみ置き換え、
+  // loadTourは対象ツアーIDに一致する行のみを抽出する
+  // （googleSheetsRowMappingのmergeTourIntoSheets/extractTourFromSheets）。
+  const googleSheetsService = new GoogleSheetsProjectService();
+  const googleSheetsPanel = createGoogleSheetsPanel(
+    {
+      clientId: localStorage.getItem(GOOGLE_SHEETS_CLIENT_ID_KEY) ?? "",
+      spreadsheetId: localStorage.getItem(GOOGLE_SHEETS_SPREADSHEET_ID_KEY) ?? "",
+    },
+    {
+      onClientIdChange: (clientId) => localStorage.setItem(GOOGLE_SHEETS_CLIENT_ID_KEY, clientId),
+      onSpreadsheetIdChange: (spreadsheetId) =>
+        localStorage.setItem(GOOGLE_SHEETS_SPREADSHEET_ID_KEY, spreadsheetId),
+      onAuthorize: () => {
+        void (async () => {
+          const clientId = localStorage.getItem(GOOGLE_SHEETS_CLIENT_ID_KEY) ?? "";
+          if (!clientId) {
+            googleSheetsPanel.setStatus("OAuthクライアントIDを入力してください。", true);
+            return;
+          }
+          const authorized = await googleSheetsService.authorize(clientId);
+          googleSheetsPanel.setAuthorized(authorized);
+          googleSheetsPanel.setStatus(
+            authorized ? "Googleアカウントで認可されました。" : "Googleの認可に失敗しました。",
+            !authorized,
+          );
+        })();
+      },
+      onSave: () => {
+        void (async () => {
+          const spreadsheetId = localStorage.getItem(GOOGLE_SHEETS_SPREADSHEET_ID_KEY) ?? "";
+          if (!spreadsheetId) {
+            googleSheetsPanel.setStatus("スプレッドシートIDを入力してください。", true);
+            return;
+          }
+          const tour = store.toTourConfig();
+          const result = validateTourConfig(tour);
+          if (!result.valid) {
+            googleSheetsPanel.setStatus(`保存失敗: ${result.errors.join(" / ")}`, true);
+            return;
+          }
+          try {
+            await googleSheetsService.saveTour(spreadsheetId, tour);
+            googleSheetsPanel.setStatus("スプレッドシートに保存しました。", false);
+          } catch (error) {
+            console.error("スプレッドシートへの保存に失敗しました", error);
+            googleSheetsPanel.setStatus(
+              error instanceof Error ? error.message : "スプレッドシートへの保存に失敗しました。",
+              true,
+            );
+          }
+        })();
+      },
+      onLoad: () => {
+        void (async () => {
+          const spreadsheetId = localStorage.getItem(GOOGLE_SHEETS_SPREADSHEET_ID_KEY) ?? "";
+          if (!spreadsheetId) {
+            googleSheetsPanel.setStatus("スプレッドシートIDを入力してください。", true);
+            return;
+          }
+          const tourId = layout.idInput.value;
+          if (!tourId) {
+            googleSheetsPanel.setStatus("ツアーIDを入力してください。", true);
+            return;
+          }
+          try {
+            const tour = await googleSheetsService.loadTour(spreadsheetId, tourId);
+            store.load(tour);
+            layout.idInput.value = store.getMetadata().id;
+            layout.titleInput.value = store.getMetadata().title;
+            renderPois();
+            renderRoutes();
+            googleSheetsPanel.setStatus(`スプレッドシートから読み込みました（${tourId}）。`, false);
+          } catch (error) {
+            console.error("スプレッドシートからの読み込みに失敗しました", error);
+            googleSheetsPanel.setStatus(
+              error instanceof Error
+                ? error.message
+                : "スプレッドシートからの読み込みに失敗しました。",
+              true,
+            );
+          }
+        })();
+      },
+    },
+  );
+  layout.googleSheetsSection.appendChild(googleSheetsPanel.root);
 
   // 現在サイトに公開されているサンプルツアーを初期状態として読み込む。
   try {
