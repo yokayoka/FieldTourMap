@@ -14,10 +14,12 @@
   - 完了メモ: `mountApp()`の疎通テスト作成→実装でTDDサイクルを確認、`tsc --noEmit`・`vite build`・`eslint`すべて成功
   - _Requirements: 9, 12_
 
-- [ ] 2. 🔴 GitHub Actions によるCI/CDパイプライン構築
+- [x] 2. ✅️ GitHub Actions によるCI/CDパイプライン構築
   - `.github/workflows/deploy.yml` の作成（push時にlint→型チェック→単体テスト→buildを実行）
   - テスト失敗時にGitHub Pagesへのデプロイをブロックする設定
   - GitHub Pagesへの自動デプロイ設定（base path・サブパス配信を考慮）
+  - 完了メモ: 公式Actions方式（`upload-pages-artifact` + `deploy-pages`）を採用。buildジョブ成功後にのみdeployジョブが走る`needs:`構成。`vite.config.ts`のbase pathを実リポジトリ名`FieldTourMap`に合わせて修正し、ビルド成果物のパスを確認済み。リモート`origin`を`https://github.com/yokayoka/FieldTourMap.git`として登録
+  - 残タスク: GitHubリポジトリのSettings → Pages → Source を「GitHub Actions」に変更（初回push後、リポジトリ側で手動設定が必要）
   - _Requirements: 9, 12_
 
 - [ ] 3. 🔴 コアデータモデルとConfigLoader/ConfigValidatorの実装（TDD）
