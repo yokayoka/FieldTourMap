@@ -68,12 +68,17 @@
   - 完了メモ: WCAG相対輝度に基づく`getContrastRatio()`をTDDで実装（9テスト。黒白21:1等の既知値、実際のUI配色5組がAA基準4.5:1以上であることを固定する回帰テスト付き）。`.layer-control`と`.location-control`を個別のposition:fixedから共通の`.bottom-controls`flexコンテナに統合し、固定px値によるオーバーラップリスクを解消（location-controlが常にlayer-controlの上に積み上がる構造に変更）
   - Playwrightで360×640ビューポート確認: 横スクロールなし（scrollWidth=clientWidth=360）、タップ対象5種すべて44px以上、location/layer control間の重なりなし、POI詳細パネルもレイアウト崩れなしをスクリーンショットで確認
   - _Requirements: 6_
-  - _Requirements: 6_
 
-- [ ] 9. 🔴 Phase 1統合テストとMVP動作確認
+- [x] 9. ✅️ Phase 1統合テストとMVP動作確認
   - Playwright等によるモックGeolocation・モックfetchを用いた結合テスト（レイヤー切替、現在地表示、POI詳細表示のE2Eフロー）
   - 実際にGitHub Pages（テスト用リポジトリ）へデプロイし、スマートフォン実機/エミュレータで一連の動作を確認
+  - 完了メモ: `@playwright/test`を正式な開発依存として導入し、モバイル端末プロファイル（Pixel 7）を既定とする`playwright.config.ts`を作成。`e2e/`配下に10件のテスト（レイヤー切替とリロード後の状態復元、現在地表示と追従切替、位置情報拒否時のエラー表示と操作継続、POI詳細パネルの表示/クローズ、360px幅でのレイアウト・タップ領域・コントロール重なり）を作成し、全件成功
+  - CIワークフローにPlaywrightブラウザインストール（chromium）とE2E実行ステップを追加し、失敗時はレポートをアーティファクトとして保存。push後の実CI実行でもE2E含め全ジョブ成功を確認（約46秒）
+  - 本番URL（`https://yokayoka.github.io/FieldTourMap/`）に対しPlaywrightで実ブラウザ確認: 地図表示、3種のベースレイヤーボタン、現在地マーカー、POIマーカータップ→詳細パネル表示（「露頭A（花崗岩貫入部）」）まで、コンソールエラーなしで動作を確認
+  - 発見した小さな不具合: E2Eテスト初回実行時、`layerControl`のボタンが`role="radio"`（Task 5でラジオグループとして実装）であるにもかかわらず`getByRole("button", ...)`で参照しており2件失敗。`getByRole("radio", ...)`に修正して解消（アプリ側のバグではなくテストの参照ミス）
   - _Requirements: 9, 1, 2, 4_
+
+**Phase 1 (MVP) 完了**: タスク1〜9すべて完了。地図表示・レイヤー切替・GNSS現在地表示・オフライン基盤なしの状態でのPOI/参考文献表示・レスポンシブUIの基本機能がGitHub Pages上で動作し、単体テスト81件・E2Eテスト10件がCIで継続的に検証される状態になった。
 
 ## Phase 2: 機能拡張
 
