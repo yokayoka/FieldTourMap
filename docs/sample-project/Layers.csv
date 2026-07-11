@@ -1,0 +1,5 @@
+id,name,type,urlTemplate,attribution,opacity,minZoom,maxZoom,defaultVisible
+gsi-std,地理院地図（標準地図）,base,https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png,地理院タイル（国土地理院）,1,2,18,true
+gsi-photo,地理院地図（写真）,base,https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg,地理院タイル（国土地理院）,1,2,18,false
+osm,OpenStreetMap,base,https://tile.openstreetmap.org/{z}/{x}/{y}.png,© OpenStreetMap contributors,1,2,19,false
+aist-geology,シームレス地質図V2,overlay,https://gbank.gsj.jp/seamless/v2/api/1.3/tiles/{z}/{y}/{x}.png,産総研地質調査総合センター 20万分の1日本シームレス地質図V2,0.6,2,16,false

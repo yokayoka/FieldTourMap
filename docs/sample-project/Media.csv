@@ -1,0 +1,3 @@
+tourId,poiId,url,caption,type
+sample-tour,poi-01,https://drive.google.com/file/d/xxxxxxxxxxxxxxxxxxxx/view,露頭全景写真（2025年撮影）,photo
+sample-tour,poi-02,https://www.dropbox.com/s/xxxxxxxxxxxx/fault-outcrop.mp4?dl=0,断層面の解説動画（3分）,video

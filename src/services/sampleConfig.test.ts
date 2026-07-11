@@ -2,11 +2,18 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { validateLayerDefinition, validateTourConfig } from "./configValidator";
+import { parseCsv } from "../utils/csv";
+import { sheetToLayers, extractTourFromSheets, SHEET_NAMES } from "./googleSheetsRowMapping";
 import type { LayerDefinition, TourConfig } from "../types/config";
 
 function readJson<T>(relativePath: string): T {
   const fullPath = resolve(__dirname, "../../public/config", relativePath);
   return JSON.parse(readFileSync(fullPath, "utf-8")) as T;
+}
+
+function readSampleProjectSheet(sheetName: string): string[][] {
+  const fullPath = resolve(__dirname, "../../docs/sample-project", `${sheetName}.csv`);
+  return parseCsv(readFileSync(fullPath, "utf-8"));
 }
 
 describe("public/config/layers.json", () => {
@@ -77,6 +84,28 @@ describe("public/config/tours/index.json", () => {
       expect(result.valid).toBe(true);
       expect(tour.id).toBe(entry.id);
       tour.layerIds.forEach((id) => expect(validLayerIds.has(id)).toBe(true));
+    });
+  });
+});
+
+describe("docs/sample-project/*.csv（Requirement 16のGoogleスプレッドシートサンプル）", () => {
+  it("Layers.csvはpublic/config/layers.jsonと同一のレイヤー一覧にパースできる", () => {
+    const layers = sheetToLayers(readSampleProjectSheet("Layers"));
+    expect(layers).toEqual(readJson<LayerDefinition[]>("layers.json"));
+  });
+
+  it("各ツアーのシート群は対応するtours/*.jsonと同一のツアー設定にパースできる", () => {
+    const sheets = Object.fromEntries(
+      SHEET_NAMES.filter((name) => name !== "Layers").map((name) => [
+        name,
+        readSampleProjectSheet(name),
+      ]),
+    );
+
+    const index = readJson<{ id: string; title: string }[]>("tours/index.json");
+    index.forEach((entry) => {
+      const expected = readJson<TourConfig>(`tours/${entry.id}.json`);
+      expect(extractTourFromSheets(sheets, entry.id)).toEqual(expected);
     });
   });
 });

@@ -1,0 +1,6 @@
+tourId,routeId,order,lat,lng
+sample-tour,route-01,0,35.68,139.766
+sample-tour,route-01,1,35.681236,139.767125
+sample-tour,route-01,2,35.68255,139.76845
+second-tour,route-101,0,35.65,139.72
+second-tour,route-101,1,35.652,139.725

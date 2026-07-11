@@ -1,0 +1,3 @@
+tourId,title,description,layerIds
+sample-tour,サンプル巡検コース,動作確認用のサンプルツアーです。,"gsi-std,gsi-photo,osm,aist-geology"
+second-tour,第二巡検コース（海岸地形）,海岸段丘・堆積岩の観察を行う巡検コースのサンプルです。,"osm,gsi-photo"
