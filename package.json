@@ -9,11 +9,13 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.61.1",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^26.1.1",
     "eslint": "^10.7.0",
