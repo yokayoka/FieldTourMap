@@ -4,6 +4,7 @@ import L from "leaflet";
 import { AdminLayerListStore } from "./services/adminLayerListStore";
 import { createLayerListView } from "./components/layerListView";
 import { createLayerEditorForm } from "./components/layerEditorForm";
+import { createAdminNav } from "./components/adminNav";
 import { downloadTextFile } from "../../src/utils/downloadTextFile";
 import { validateLayerDefinition } from "../../src/services/configValidator";
 import type { LayerDefinition } from "../../src/types/config";
@@ -21,6 +22,8 @@ interface Layout {
 }
 
 function buildLayout(root: HTMLElement): Layout {
+  const nav = createAdminNav("layers");
+
   const heading = document.createElement("h1");
   heading.textContent = "レイヤー編集（管理ツール）";
 
@@ -60,7 +63,7 @@ function buildLayout(root: HTMLElement): Layout {
   mapContainer.className = "admin-preview-map";
 
   main.append(listSection, formSection, mapContainer);
-  root.append(heading, toolbar, statusText, main);
+  root.append(nav, heading, toolbar, statusText, main);
 
   return { listSection, formSection, mapContainer, exportButton, loadInput, statusText };
 }

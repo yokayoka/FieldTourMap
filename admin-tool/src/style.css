@@ -9,6 +9,23 @@ h1 {
   font-size: 20px;
 }
 
+.admin-nav {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.admin-nav__link {
+  color: #1a5fb4;
+}
+
+.admin-nav__link--current {
+  font-weight: bold;
+  color: #111;
+  text-decoration: none;
+}
+
 .admin-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -122,4 +139,164 @@ h1 {
   border: 1px solid #333;
   border-radius: 8px;
   background: #fff;
+}
+
+.tour-metadata-form {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.tour-metadata-form label {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  gap: 4px;
+}
+
+.tour-metadata-form input {
+  min-height: 36px;
+  padding: 4px 8px;
+}
+
+.map-mode-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.map-mode-toolbar button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.map-mode-toolbar__add-poi--active,
+.map-mode-toolbar__add-route--active {
+  background: #1a5fb4;
+  border-color: #1a5fb4;
+  color: #fff;
+}
+
+.map-mode-toolbar__status {
+  font-size: 13px;
+  color: #444;
+}
+
+.admin-list-column section {
+  margin-bottom: 16px;
+}
+
+.simple-list-view__add {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #fff;
+  margin-bottom: 8px;
+}
+
+.simple-list-view__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.simple-list-view__item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.simple-list-view__edit,
+.simple-list-view__delete {
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.poi-editor-form,
+.route-editor-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid #333;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.poi-editor-form[hidden],
+.route-editor-form[hidden] {
+  display: none;
+}
+
+.poi-editor-form__field {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  gap: 4px;
+}
+
+.poi-editor-form__field input,
+.poi-editor-form__field textarea {
+  min-height: 36px;
+  padding: 4px 8px;
+  font-size: 14px;
+}
+
+.poi-editor-form__media h3,
+.poi-editor-form__papers h3 {
+  font-size: 14px;
+  margin: 8px 0 4px;
+}
+
+.link-list-editor__row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.link-list-editor__url {
+  flex: 2;
+}
+
+.link-list-editor__label {
+  flex: 1;
+}
+
+.link-list-editor input,
+.link-list-editor select {
+  min-height: 36px;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.link-list-editor__add,
+.link-list-editor__remove,
+.poi-editor-form__actions button,
+.route-editor-form__actions button {
+  min-height: 36px;
+  padding: 4px 10px;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.poi-editor-form__actions,
+.route-editor-form__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.poi-editor-form__actions button,
+.route-editor-form__actions button {
+  min-height: 44px;
 }
