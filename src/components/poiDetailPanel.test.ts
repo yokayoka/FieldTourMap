@@ -92,4 +92,23 @@ describe("createPoiDetailPanel", () => {
 
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("renders a button to get a Google Maps link for the POI (Requirement 14.1)", () => {
+    const panel = createPoiDetailPanel();
+    panel.show(poiWithLinks);
+
+    expect(panel.root.querySelector(".poi-detail-panel__google-maps-link")).not.toBeNull();
+  });
+
+  it("calls onGetGoogleMapsLink with the shown POI when that button is clicked", () => {
+    const onGetGoogleMapsLink = vi.fn();
+    const panel = createPoiDetailPanel(undefined, onGetGoogleMapsLink);
+    panel.show(poiWithLinks);
+
+    panel.root
+      .querySelector<HTMLButtonElement>(".poi-detail-panel__google-maps-link")!
+      .click();
+
+    expect(onGetGoogleMapsLink).toHaveBeenCalledWith(poiWithLinks);
+  });
 });

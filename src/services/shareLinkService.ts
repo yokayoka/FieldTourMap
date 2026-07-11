@@ -1,8 +1,7 @@
 import type { ShareViewState } from "../types/config";
+import { copyToClipboard, defaultClipboard, type ClipboardLike } from "../utils/clipboard";
 
-export interface ClipboardLike {
-  writeText(text: string): Promise<void>;
-}
+export type { ClipboardLike };
 
 export interface WebShareLike {
   share(data: { url: string }): Promise<void>;
@@ -20,11 +19,6 @@ const COORDINATE_PRECISION = 6;
 function defaultBaseUrl(): string {
   if (typeof location === "undefined") return "";
   return `${location.origin}${location.pathname}`;
-}
-
-function defaultClipboard(): ClipboardLike | undefined {
-  if (typeof navigator === "undefined" || !navigator.clipboard) return undefined;
-  return navigator.clipboard;
 }
 
 function defaultWebShare(): WebShareLike | undefined {
@@ -110,13 +104,7 @@ export class ShareLinkService {
   }
 
   async copyToClipboard(url: string): Promise<boolean> {
-    if (!this.clipboard) return false;
-    try {
-      await this.clipboard.writeText(url);
-      return true;
-    } catch {
-      return false;
-    }
+    return copyToClipboard(url, this.clipboard);
   }
 
   async shareViaWebShareApi(url: string): Promise<boolean> {

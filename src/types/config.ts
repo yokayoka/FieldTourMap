@@ -70,3 +70,8 @@ export interface ShareViewState {
   overlayLayerIds: string[];
   poiId?: string;
 }
+
+export interface GoogleMapsLinkParams {
+  lat: number;
+  lng: number;
+}

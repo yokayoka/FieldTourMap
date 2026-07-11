@@ -39,7 +39,10 @@ function renderLinkSection(
   container.appendChild(list);
 }
 
-export function createPoiDetailPanel(onClose?: () => void): PoiDetailPanel {
+export function createPoiDetailPanel(
+  onClose?: () => void,
+  onGetGoogleMapsLink?: (poi: PointOfInterest) => void,
+): PoiDetailPanel {
   const root = document.createElement("div");
   root.className = "poi-detail-panel";
   root.hidden = true;
@@ -56,17 +59,28 @@ export function createPoiDetailPanel(onClose?: () => void): PoiDetailPanel {
   const description = document.createElement("p");
   description.className = "poi-detail-panel__description";
 
+  const googleMapsLinkButton = document.createElement("button");
+  googleMapsLinkButton.type = "button";
+  googleMapsLinkButton.className = "poi-detail-panel__google-maps-link";
+  googleMapsLinkButton.textContent = "Googleマップで開くリンクを取得";
+
   const mediaSection = document.createElement("div");
   mediaSection.className = "poi-detail-panel__section poi-detail-panel__media";
 
   const paperSection = document.createElement("div");
   paperSection.className = "poi-detail-panel__section poi-detail-panel__papers";
 
-  root.append(closeButton, title, description, mediaSection, paperSection);
+  root.append(closeButton, title, description, googleMapsLinkButton, mediaSection, paperSection);
+
+  let currentPoi: PointOfInterest | null = null;
+  googleMapsLinkButton.addEventListener("click", () => {
+    if (currentPoi) onGetGoogleMapsLink?.(currentPoi);
+  });
 
   return {
     root,
     show(poi: PointOfInterest) {
+      currentPoi = poi;
       title.textContent = poi.name;
       description.textContent = poi.description;
       renderLinkSection(

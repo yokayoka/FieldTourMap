@@ -13,10 +13,14 @@ import { createPrecacheControl } from "./components/precacheControl";
 import { ObservationMemoStore } from "./services/observationMemoStore";
 import { createMemoPanel } from "./components/memoPanel";
 import { createMemoControl } from "./components/memoControl";
-import type { LayerDefinition, ObservationMemo } from "./types/config";
+import type { LatLng, LayerDefinition, ObservationMemo } from "./types/config";
 import { downloadTextFile } from "./utils/downloadTextFile";
 import { ShareLinkService } from "./services/shareLinkService";
 import { createShareControl } from "./components/shareControl";
+import { GoogleMapsLinkService } from "./services/googleMapsLinkService";
+import { createGoogleMapsLinkControl } from "./components/googleMapsLinkControl";
+import { createLinkFallbackPanel } from "./components/linkFallbackPanel";
+import { showToast } from "./components/toast";
 
 // 初期表示位置は現在地取得（Requirement 1）が成功するまでの暫定フォールバック。
 const DEFAULT_CENTER: L.LatLngExpression = [35.681236, 139.767125];
@@ -205,6 +209,51 @@ function setupShareControl(
   root.appendChild(control.root);
 }
 
+/**
+ * 任意地点のGoogleマップリンクを取得する機能（Requirement 14）。
+ * 地図タップモードと、POI詳細パネルの「Googleマップで開くリンクを
+ * 取得」ボタンの双方から共通の requestLink() を呼び出せるようにする。
+ */
+function setupGoogleMapsLinkFeature(
+  map: L.Map,
+  root: HTMLElement,
+  bottomControls: HTMLElement,
+): { requestLink: (point: LatLng) => Promise<void> } {
+  const googleMapsLinkService = new GoogleMapsLinkService();
+
+  const fallbackPanel = createLinkFallbackPanel({ onClose: () => {} });
+  root.appendChild(fallbackPanel.root);
+
+  async function requestLink(point: LatLng): Promise<void> {
+    const url = googleMapsLinkService.buildSearchUrl(point);
+    // クリップボードAPIが使えない環境では、選択・手動コピー可能な
+    // フォールバックUIを表示する（Requirement 14.6）。
+    const copied = await googleMapsLinkService.copyToClipboard(url);
+    if (copied) {
+      showToast(root, "Googleマップのリンクをコピーしました");
+    } else {
+      fallbackPanel.show(url);
+    }
+  }
+
+  let placementActive = false;
+  const control = createGoogleMapsLinkControl({
+    onTogglePlacement: (active) => {
+      placementActive = active;
+    },
+  });
+  bottomControls.appendChild(control.root);
+
+  map.on("click", (event: L.LeafletMouseEvent) => {
+    if (!placementActive) return;
+    placementActive = false;
+    control.setActive(false);
+    void requestLink({ lat: event.latlng.lat, lng: event.latlng.lng });
+  });
+
+  return { requestLink };
+}
+
 function createMemoIcon(): L.DivIcon {
   return L.divIcon({
     className: "memo-marker",
@@ -279,7 +328,8 @@ function setupObservationMemos(map: L.Map, root: HTMLElement, bottomControls: HT
 async function setupPoiOverlay(
   map: L.Map,
   root: HTMLElement,
-  initialPoiId?: string,
+  initialPoiId: string | undefined,
+  requestGoogleMapsLink: (point: LatLng) => Promise<void>,
 ): Promise<PoiRouteOverlay | null> {
   let tour;
   try {
@@ -289,7 +339,10 @@ async function setupPoiOverlay(
     return null;
   }
 
-  const detailPanel = createPoiDetailPanel(() => overlay.closePoiDetail());
+  const detailPanel = createPoiDetailPanel(
+    () => overlay.closePoiDetail(),
+    (poi) => void requestGoogleMapsLink(poi.position),
+  );
   root.appendChild(detailPanel.root);
 
   // POIの参照はoverlay.getPoiById()経由で行う。tour変数を直接クロージャで
@@ -370,8 +423,9 @@ export async function initializeMap(root: HTMLElement, mapContainer: HTMLElement
 
   let poiOverlay: PoiRouteOverlay | null = null;
   setupShareControl(map, layerManager, () => poiOverlay, root, shareLinkService);
+  const googleMapsLink = setupGoogleMapsLinkFeature(map, root, bottomControls);
 
-  poiOverlay = await setupPoiOverlay(map, root, sharedState?.poiId);
+  poiOverlay = await setupPoiOverlay(map, root, sharedState?.poiId, googleMapsLink.requestLink);
 }
 
 const appRoot = document.querySelector<HTMLDivElement>("#app");

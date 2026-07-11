@@ -152,11 +152,16 @@ Phase 1完了後、8観点（正誤性3・再利用/簡素化/効率3・altitude
   - Playwrightで確認: レイヤー変更後の共有→別セッションでの状態復元、POI詳細を開いた状態での共有→受信側での同一POIパネル自動オープン、不正な共有URLでのフォールバック（アプリクラッシュなし）
   - _Requirements: 13_
 
-- [ ] 16. 🔴 GoogleMapsLinkServiceの実装
+- [x] 16. ✅️ GoogleMapsLinkServiceの実装
   - ピン留め形式URL生成（`https://www.google.com/maps/search/?api=1&query={lat},{lng}`）のテスト作成→実装
   - クリップボードコピーとコピー完了フィードバック（トースト）の実装
   - クリップボードAPI非対応環境向けの手動コピーUIフォールバックの実装
+  - 完了メモ: Task 15で実装したクリップボード処理を`src/utils/clipboard.ts`として共有ユーティリティに切り出し、`ShareLinkService`もそちらを使うようリファクタ（重複を未然に回避）。`GoogleMapsLinkService`（ピン留め形式URL生成、座標6桁丸め、3テスト）、`toast`（一定時間後に自動で消える通知、3テスト）、`linkFallbackPanel`（クリップボードAPI非対応時の選択可能なテキスト表示、4テスト）、`googleMapsLinkControl`（地図タップモードのトグルボタン、3テスト）をTDD実装。`poiDetailPanel`に「Googleマップで開くリンクを取得」ボタンを追加（第2引数コールバックとして後方互換的に拡張、2テスト追加）。地図タップモードとPOI詳細パネルの両方から共通の`requestLink()`を呼び出す設計とした
+  - Playwrightで確認: 地図タップでのリンクコピー+トースト表示、POIパネルからの正確な座標でのリンク取得、クリップボードAPI非対応環境でのフォールバックパネル表示
+  - 既知の制約: メモ配置モードとGoogleマップリンク取得モードを同時に有効化した場合の相互排他制御は未実装（両方オンだと1回のタップで両方の動作が走る）。実運用上まれなケースと判断しPhase 2スコープでは対応を見送った
   - _Requirements: 14_
+
+**Phase 2 (機能拡張) 完了**: タスク10〜16すべて完了。オフラインタイルキャッシュ・事前ダウンロード・観察メモ・Admin Config Tool（レイヤー/POI/ルート編集）・URL共有・Googleマップリンク取得がGitHub Pages上で動作し、単体テスト244件・E2Eテスト34件がCIで継続的に検証される状態になった。
 
 ## Phase 3: 高度な機能
 

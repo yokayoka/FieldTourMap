@@ -391,3 +391,92 @@ body,
   color: #111;
   font-size: 14px;
 }
+
+.google-maps-link-control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.google-maps-link-control__toggle {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #fff;
+  color: #111;
+  font-size: 14px;
+}
+
+.google-maps-link-control__toggle--active {
+  background: #1a5fb4;
+  border-color: #1a5fb4;
+  color: #fff;
+}
+
+.poi-detail-panel__google-maps-link {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 8px 12px;
+  margin: 4px 0;
+  border: 1px solid #1a5fb4;
+  border-radius: 8px;
+  background: #fff;
+  color: #1a5fb4;
+  font-size: 13px;
+}
+
+/* コピー完了等の一時的な通知（Requirement 14.5） */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 1300;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: rgba(17, 17, 17, 0.9);
+  color: #fff;
+  font-size: 13px;
+  max-width: 80vw;
+  text-align: center;
+}
+
+/* クリップボードAPI非対応環境向けの手動コピー用フォールバック
+   （Requirement 14.6） */
+.link-fallback-panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1200;
+  padding: 16px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  border-radius: 16px 16px 0 0;
+  background: #fff;
+  color: #111;
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.35);
+}
+
+.link-fallback-panel__input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 8px;
+  font-size: 14px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+.link-fallback-panel__close {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #fff;
+  color: #111;
+}
