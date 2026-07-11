@@ -58,6 +58,31 @@ test.describe("URL共有機能（Requirement 13）", () => {
     await otherContext.close();
   });
 
+  test("クリップボードAPIが使えない場合は手動コピー用のフォールバックUIが表示される", async ({
+    page,
+  }) => {
+    // Web Share APIはテスト用ブラウザでは既定で未対応（navigator.share
+    // 自体が存在しない）ため、クリップボードAPIも使えなくすることで
+    // 両方の共有手段が失敗するケースを再現する（iOS Safari等で発生しうる）。
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: undefined,
+      });
+    });
+
+    await page.goto("/");
+    await page.locator(".share-control__button").click();
+
+    const panel = page.locator(".link-fallback-panel");
+    await expect(panel).toBeVisible();
+    const input = panel.locator(".link-fallback-panel__input");
+    await expect(input).toHaveValue(/^http:\/\/localhost:4173\/\?/);
+
+    await panel.locator(".link-fallback-panel__close").click();
+    await expect(panel).toBeHidden();
+  });
+
   test("不正な共有URLの場合はエラーにならず初期表示にフォールバックする（Requirement 13.7）", async ({
     page,
   }) => {

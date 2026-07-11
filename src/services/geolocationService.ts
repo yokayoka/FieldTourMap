@@ -25,10 +25,28 @@ export interface GeolocationUpdate {
   heading: number | null;
 }
 
+export interface OrientationPermissionApiLike {
+  requestPermission(): Promise<"granted" | "denied">;
+}
+
 export interface GeolocationServiceOptions {
   geolocation?: GeolocationApiLike;
   orientationTarget?: OrientationTargetLike;
+  orientationPermissionApi?: OrientationPermissionApiLike;
   now?: () => number;
+}
+
+// iOS 13以降のSafariは、DeviceOrientationEventコンストラクタに
+// requestPermission()静的メソッドを追加しており、ユーザー操作の文脈内で
+// これを呼び出し許可を得ない限りdeviceorientationイベントを一切発火しない
+// （Android Chrome等にはこの制約はない）。
+function defaultOrientationPermissionApi(): OrientationPermissionApiLike | undefined {
+  if (typeof DeviceOrientationEvent === "undefined") return undefined;
+  const ctor = DeviceOrientationEvent as unknown as {
+    requestPermission?: () => Promise<"granted" | "denied">;
+  };
+  if (typeof ctor.requestPermission !== "function") return undefined;
+  return { requestPermission: () => ctor.requestPermission!() };
 }
 
 // deviceorientationは端末によって最大60Hz程度で発火しうるため、
@@ -61,10 +79,12 @@ function mapErrorMessage(error: GeolocationPositionError): string {
 export class GeolocationService {
   private readonly geolocation?: GeolocationApiLike;
   private readonly orientationTarget: OrientationTargetLike;
+  private readonly orientationPermissionApi?: OrientationPermissionApiLike;
   private readonly now: () => number;
 
   private watchId: number | null = null;
   private orientationHandler: ((event: OrientationEventLike) => void) | null = null;
+  private orientationListenerAttached = false;
   private lastPosition: { lat: number; lng: number; accuracy: number } | null = null;
   private lastHeading: number | null = null;
   private lastHeadingUpdateAt: number | null = null;
@@ -74,6 +94,8 @@ export class GeolocationService {
     this.geolocation =
       options.geolocation ?? (typeof navigator !== "undefined" ? navigator.geolocation : undefined);
     this.orientationTarget = options.orientationTarget ?? window;
+    this.orientationPermissionApi =
+      options.orientationPermissionApi ?? defaultOrientationPermissionApi();
     this.now = options.now ?? Date.now;
   }
 
@@ -114,7 +136,36 @@ export class GeolocationService {
       this.lastHeading = heading;
       onUpdate({ ...this.lastPosition, heading });
     };
-    this.orientationTarget.addEventListener("deviceorientation", this.orientationHandler);
+
+    // iOS 13+ Safariではユーザー操作の文脈内でrequestPermission()を経る
+    // までdeviceorientationは発火しないため、ここでは自動アタッチしない。
+    // 呼び出し側がユーザー操作ハンドラからrequestOrientationPermission()
+    // を呼ぶ必要がある（Android Chrome等、APIが存在しない環境では従来
+    // 通り即座にアタッチする）。
+    if (!this.orientationPermissionApi) {
+      this.orientationTarget.addEventListener("deviceorientation", this.orientationHandler);
+      this.orientationListenerAttached = true;
+    }
+  }
+
+  /**
+   * iOS 13+ Safariでの方位取得許可をリクエストする。ボタンのクリック
+   * ハンドラ等、ユーザー操作の文脈から呼び出す必要がある。許可が不要な
+   * 環境（Android Chrome等）やstartWatching()未実行時は何もしない。
+   */
+  async requestOrientationPermission(): Promise<void> {
+    if (!this.orientationPermissionApi || this.orientationListenerAttached || !this.orientationHandler) {
+      return;
+    }
+    try {
+      const result = await this.orientationPermissionApi.requestPermission();
+      if (result === "granted" && this.orientationHandler) {
+        this.orientationTarget.addEventListener("deviceorientation", this.orientationHandler);
+        this.orientationListenerAttached = true;
+      }
+    } catch (error) {
+      console.warn("方位取得の許可リクエストに失敗しました", error);
+    }
   }
 
   stopWatching(): void {
@@ -126,6 +177,7 @@ export class GeolocationService {
       this.orientationTarget.removeEventListener("deviceorientation", this.orientationHandler);
       this.orientationHandler = null;
     }
+    this.orientationListenerAttached = false;
   }
 
   setFollowMode(enabled: boolean): void {

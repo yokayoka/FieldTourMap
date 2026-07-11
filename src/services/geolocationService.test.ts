@@ -229,6 +229,99 @@ describe("GeolocationService", () => {
     expect(onError).toHaveBeenCalledWith(expect.stringMatching(/対応していません/));
   });
 
+  describe("iOS 13+ Safari: DeviceOrientationEvent.requestPermission gating", () => {
+    // iOS 13以降のSafariでは、ユーザー操作（タップ等）内から明示的に
+    // DeviceOrientationEvent.requestPermission()を呼び出さない限り
+    // deviceorientationイベントは一切発火しない。startWatching()は
+    // ページ読み込み時に自動実行されユーザー操作の文脈にないため、
+    // このAPIが存在する場合はリスナーの自動アタッチを見送り、
+    // requestOrientationPermission()（呼び出し側がボタンのクリック
+    // ハンドラ等、ユーザー操作の文脈から呼ぶ）を待つ必要がある。
+    function createFakePermissionApi(result: "granted" | "denied" | Error) {
+      return {
+        requestPermission: vi.fn(() =>
+          result instanceof Error ? Promise.reject(result) : Promise.resolve(result),
+        ),
+      };
+    }
+
+    it("does not attach the orientation listener automatically when a permission API is present", () => {
+      const geolocation = createFakeGeolocation();
+      const orientationTarget = createFakeOrientationTarget();
+      const orientationPermissionApi = createFakePermissionApi("granted");
+      const service = new GeolocationService({ geolocation, orientationTarget, orientationPermissionApi });
+
+      service.startWatching(vi.fn(), vi.fn());
+
+      expect(orientationTarget.addEventListener).not.toHaveBeenCalled();
+    });
+
+    it("attaches the listener once the user grants permission via requestOrientationPermission()", async () => {
+      const geolocation = createFakeGeolocation();
+      const orientationTarget = createFakeOrientationTarget();
+      const orientationPermissionApi = createFakePermissionApi("granted");
+      const service = new GeolocationService({ geolocation, orientationTarget, orientationPermissionApi });
+      const onUpdate = vi.fn();
+
+      service.startWatching(onUpdate, vi.fn());
+      await service.requestOrientationPermission();
+
+      expect(orientationPermissionApi.requestPermission).toHaveBeenCalled();
+      expect(orientationTarget.addEventListener).toHaveBeenCalledWith(
+        "deviceorientation",
+        expect.any(Function),
+      );
+
+      geolocation.successHandler?.(fakePosition(35.68, 139.76, 12));
+      orientationTarget.fire("deviceorientation", { webkitCompassHeading: 45, alpha: null });
+      expect(onUpdate).toHaveBeenLastCalledWith({
+        lat: 35.68,
+        lng: 139.76,
+        accuracy: 12,
+        heading: 45,
+      });
+    });
+
+    it("does not attach the listener when the user denies permission", async () => {
+      const geolocation = createFakeGeolocation();
+      const orientationTarget = createFakeOrientationTarget();
+      const orientationPermissionApi = createFakePermissionApi("denied");
+      const service = new GeolocationService({ geolocation, orientationTarget, orientationPermissionApi });
+
+      service.startWatching(vi.fn(), vi.fn());
+      await service.requestOrientationPermission();
+
+      expect(orientationTarget.addEventListener).not.toHaveBeenCalled();
+    });
+
+    it("does not throw when the permission prompt itself rejects", async () => {
+      const geolocation = createFakeGeolocation();
+      const orientationTarget = createFakeOrientationTarget();
+      const orientationPermissionApi = createFakePermissionApi(new Error("prompt blocked"));
+      const service = new GeolocationService({ geolocation, orientationTarget, orientationPermissionApi });
+
+      service.startWatching(vi.fn(), vi.fn());
+
+      await expect(service.requestOrientationPermission()).resolves.not.toThrow();
+      expect(orientationTarget.addEventListener).not.toHaveBeenCalled();
+    });
+
+    it("is a no-op on platforms that don't require the permission (e.g. Android Chrome)", async () => {
+      const geolocation = createFakeGeolocation();
+      const orientationTarget = createFakeOrientationTarget();
+      const service = new GeolocationService({ geolocation, orientationTarget });
+
+      service.startWatching(vi.fn(), vi.fn());
+      // Androidでは既にstartWatching()時点でリスナーがアタッチ済み。
+      expect(orientationTarget.addEventListener).toHaveBeenCalledTimes(1);
+
+      await service.requestOrientationPermission();
+
+      // 二重にアタッチされないこと。
+      expect(orientationTarget.addEventListener).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("falls back to navigator.geolocation when no geolocation option is supplied", () => {
     const navigatorGeolocation = createFakeGeolocation();
     vi.stubGlobal("navigator", { ...globalThis.navigator, geolocation: navigatorGeolocation });

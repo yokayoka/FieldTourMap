@@ -22,7 +22,7 @@ import { ShareLinkService } from "./services/shareLinkService";
 import { createShareControl } from "./components/shareControl";
 import { GoogleMapsLinkService } from "./services/googleMapsLinkService";
 import { createGoogleMapsLinkControl } from "./components/googleMapsLinkControl";
-import { createLinkFallbackPanel } from "./components/linkFallbackPanel";
+import { createLinkFallbackPanel, type LinkFallbackPanel } from "./components/linkFallbackPanel";
 import { showToast } from "./components/toast";
 
 // 初期表示位置は現在地取得（Requirement 1）が成功するまでの暫定フォールバック。
@@ -62,7 +62,13 @@ function setupLocationTracking(map: L.Map, bottomControls: HTMLElement): void {
   let accuracyCircle: L.Circle | null = null;
 
   const locationControl = createLocationControl({
-    onToggleFollow: (enabled) => geolocationService.setFollowMode(enabled),
+    onToggleFollow: (enabled) => {
+      geolocationService.setFollowMode(enabled);
+      // iOS 13+ Safariでは方位取得の許可リクエストをユーザー操作の文脈内
+      // から呼び出す必要があるため、ボタンのクリックハンドラで行う
+      // （Android Chrome等では何もしない。GeolocationServiceの実装参照）。
+      void geolocationService.requestOrientationPermission();
+    },
   });
   bottomControls.appendChild(locationControl.root);
 
@@ -175,6 +181,7 @@ function setupShareControl(
   getCurrentTourId: () => string | undefined,
   topControls: HTMLElement,
   shareLinkService: ShareLinkService,
+  fallbackPanel: LinkFallbackPanel,
 ): void {
   const control = createShareControl({
     onShare: async () => {
@@ -199,9 +206,14 @@ function setupShareControl(
       if (await shareLinkService.copyToClipboard(url)) {
         return { success: true, message: "リンクをコピーしました" };
       }
+      // Web Share API・クリップボードAPIのいずれも使えない/失敗した環境
+      // （iOS Safariでのユーザー操作コンテキスト消失等を含む）でも共有
+      // 手段を失わないよう、手動コピー用フォールバックUIを表示する
+      // （Googleマップリンク取得機能のRequirement 14.6と同様の設計）。
+      fallbackPanel.show(url);
       return {
         success: false,
-        message: "共有に失敗しました。ブラウザの設定を確認してください。",
+        message: "自動コピーができませんでした。下に表示されたリンクをコピーしてください。",
       };
     },
   });
@@ -220,11 +232,9 @@ function setupGoogleMapsLinkFeature(
   map: L.Map,
   root: HTMLElement,
   bottomControls: HTMLElement,
+  fallbackPanel: LinkFallbackPanel,
 ): { requestLink: (point: LatLng) => Promise<void> } {
   const googleMapsLinkService = new GoogleMapsLinkService();
-
-  const fallbackPanel = createLinkFallbackPanel({ onClose: () => {} });
-  root.appendChild(fallbackPanel.root);
 
   async function requestLink(point: LatLng): Promise<void> {
     const url = googleMapsLinkService.buildSearchUrl(point);
@@ -525,7 +535,12 @@ export async function initializeMap(root: HTMLElement, mapContainer: HTMLElement
   setupPrecacheControl(map, layerManager, layers, layerControl.root, offlineCacheService);
   setupObservationMemos(map, root, bottomControls);
 
-  const googleMapsLink = setupGoogleMapsLinkFeature(map, root, bottomControls);
+  // クリップボードAPI等が使えない/失敗した環境向けの手動コピー用UI
+  // （Requirement 14.6）。共有機能・Googleマップリンク取得機能で共用する。
+  const fallbackPanel = createLinkFallbackPanel({ onClose: () => {} });
+  root.appendChild(fallbackPanel.root);
+
+  const googleMapsLink = setupGoogleMapsLinkFeature(map, root, bottomControls, fallbackPanel);
 
   // ツアー選択・POI/ルート描画・（提案としての）レイヤー構成の切替
   // （Requirement 20）。共有URLにツアーID・明示的なレイヤー構成が含まれて
@@ -554,6 +569,7 @@ export async function initializeMap(root: HTMLElement, mapContainer: HTMLElement
     tourSwitching.getCurrentTourId,
     topControls,
     shareLinkService,
+    fallbackPanel,
   );
 }
 

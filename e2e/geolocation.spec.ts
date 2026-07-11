@@ -24,6 +24,51 @@ test.describe("現在地表示（Requirement 1、位置情報許可あり）", (
   });
 });
 
+test.describe("方位取得の許可リクエスト（iOS 13+ Safari, Requirement 1, 23）", () => {
+  test.use({
+    permissions: ["geolocation"],
+    geolocation: { latitude: 35.6895, longitude: 139.6917, accuracy: 15 },
+  });
+
+  test("ページ読み込み時ではなく、現在地ボタンのタップ（ユーザー操作）を契機に許可をリクエストする", async ({
+    page,
+  }) => {
+    // 通常のChromiumにはDeviceOrientationEvent.requestPermissionが存在
+    // しないため、iOS Safariの挙動をシミュレートする。
+    await page.addInitScript(() => {
+      (window as unknown as { __requestPermissionCalls: number }).__requestPermissionCalls = 0;
+      (
+        window as unknown as {
+          DeviceOrientationEvent: { requestPermission?: () => Promise<string> };
+        }
+      ).DeviceOrientationEvent.requestPermission = () => {
+        (window as unknown as { __requestPermissionCalls: number }).__requestPermissionCalls++;
+        return Promise.resolve("granted");
+      };
+    });
+
+    await page.goto("/");
+    await expect(page.locator(".location-marker")).toBeVisible();
+
+    const callsBeforeClick = await page.evaluate(
+      () => (window as unknown as { __requestPermissionCalls: number }).__requestPermissionCalls,
+    );
+    expect(callsBeforeClick).toBe(0);
+
+    await page.locator(".location-control__button").click();
+
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () =>
+              (window as unknown as { __requestPermissionCalls: number }).__requestPermissionCalls,
+          ),
+      )
+      .toBe(1);
+  });
+});
+
 test.describe("現在地表示（Requirement 1.4、位置情報許可なし）", () => {
   test("エラーメッセージが表示され、地図・レイヤー操作は継続できる", async ({ page }) => {
     await page.addInitScript(() => {

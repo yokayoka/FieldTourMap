@@ -227,8 +227,16 @@ Phase 1完了後、8観点（正誤性3・再利用/簡素化/効率3・altitude
   - 本タスクはドキュメント整備が主目的でありアプリケーションコードの変更は行っていないため、既存のテストスイート（単体282件・E2E 41件）に影響はない
   - _Requirements: 9, 11, 12_
 
-- [ ] 23. 🔴 実機クロスブラウザ検証
+- [x] 23. ⚠️ 実機クロスブラウザ検証（一部ブロック: 実機確認は未実施）
   - iOS Safari / Android Chrome実機でのGNSS取得・クリップボードAPI・Web Share APIの挙動差異確認と吸収
+  - 完了メモ: 本エージェントは物理的なiOS/Android実機にアクセスできないため、実機での動作確認そのものは実施できていない。代わりにコードレビューによる既知のプラットフォーム差異の洗い出しと、発見した差異への対応（コード修正・回帰テスト追加）を行った
+  - **発見・修正した実装ギャップ（iOS 13+ Safari）**: `DeviceOrientationEvent`はiOS 13以降のSafariにおいて、ユーザー操作（タップ等）の文脈内で`DeviceOrientationEvent.requestPermission()`を明示的に呼び出し許可を得ない限り`deviceorientation`イベントが一切発火しない仕様がある（Android Chrome等にはこの制約がない）。既存実装は`startWatching()`（ページ読み込み時に自動実行、ユーザー操作の文脈にない）で無条件にイベントリスナーを登録しており、iOS実機では方位矢印表示（Requirement 1.3）が機能しない可能性があった。`GeolocationService`に`requestOrientationPermission()`を追加し、iOS判定時（`DeviceOrientationEvent.requestPermission`が存在する場合）は`startWatching()`ではリスナーを自動登録せず、現在地ボタンのクリックハンドラ（ユーザー操作の文脈）から許可をリクエストしてから登録するよう修正した（`src/services/geolocationService.ts`, `src/main.ts`）。jsdom環境では`DeviceOrientationEvent.requestPermission`が未定義のため既存テストへの影響はなく、新規に5件の単体テスト＋1件のE2Eテスト（`DeviceOrientationEvent.requestPermission`をスタブ化し、ページ読み込み時点では未呼び出し・ボタンタップ後に呼び出されることを検証）を追加した
+  - **発見・修正した実装ギャップ（共有機能のフォールバック欠如）**: Googleマップリンク取得機能（Requirement 14.6）にはクリップボードAPI失敗時の手動コピー用フォールバックUI（`linkFallbackPanel`）が既にあったが、共有機能（Requirement 13）には同等のフォールバックがなく、Web Share API・クリップボードAPIの両方が失敗する環境（iOS Safariでの実行文脈喪失等、ブラウザ間の挙動差異により起こりうる）では共有手段を完全に失っていた。`linkFallbackPanel`を`main.ts`側で1つ生成し共有機能・Googleマップリンク機能で共用するようリファクタリングし、共有失敗時にも同じ手動コピーUIが表示されるよう修正した。E2Eテストを1件追加（クリップボードAPI不可環境でフォールバックUIが表示されることを確認）
+  - **レビューした上で対応不要と判断した項目**: (1) `viewport`メタタグの`user-scalable=no`はiOS 10+のアクセシビリティ機能により無視されうるが、これはAppleの意図的な仕様でありLeaflet地図のズーム操作自体には影響しないため対応不要と判断。(2) `.bottom-controls`等の`max-height: 40vh/60vh`はiOSのアドレスバー開閉に伴う動的ビューポート高の変化で多少伸縮しうるが、`height`ではなく`max-height`かつボトムシート用途であるため致命的な表示崩れのリスクは低いと判断し、確証のない`100dvh`等への変更は見送った。(3) クリップボードAPI非対応の古いiOS（<13.4）向けに`document.execCommand('copy')`等の非推奨APIを追加することは、既にWeb Share API→Clipboard API→手動コピーUIの3段階フォールバックを備えているため不要と判断した
+  - **ユーザーに実機確認をお願いしたい項目（チェックリスト）**: 上記の対応がコードレビューベースであり実機での動作を保証するものではないため、可能であれば以下を実機で確認いただきたい。
+    1. iOS Safari実機で現在地ボタンをタップした際、方位取得の許可ダイアログが表示され、許可すると方位矢印（現在地マーカーの矢印）が向きに応じて回転すること
+    2. iOS Safari / Android Chrome実機で共有ボタン・Googleマップリンク取得ボタンをタップした際、クリップボードへのコピーまたはOS標準の共有シートが正しく動作すること（失敗した場合は手動コピー用UIが表示されること）
+    3. iOS Safari実機でGNSS現在地表示・レイヤー切替・POI表示等の基本機能が問題なく動作すること
   - _Requirements: 1, 6, 13, 14_
 
 - [ ] 24. 🔴 本番リリース前最終レビュー
