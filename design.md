@@ -5,8 +5,6 @@
 
 Requirement 15・16により、GitHubを使わない第三者の主催者も本アプリを流用できる。主催者はGoogleスプレッドシート上でレイヤー・ツアーを編集し（Admin Config ToolからOAuth経由で読み書き）、スプレッドシートを「ウェブに公開」設定した上でそのIDをURLパラメータ（`?project=<spreadsheetId>`）として参加者に共有する。参加者向けMap Viewerはこのパラメータを検出すると、GitHubリポジトリのフォーク・デプロイなしに、認証情報を一切使わない公開CSV読み取りのみでそのプロジェクトを表示する。
 
-Requirement 17により、Googleアカウントを使わない主催者向けに、Admin Config Toolはエクセルブック（`.xlsx`、複数シート構成）形式でのプロジェクトのダウンロード・アップロードにも対応する。Googleスプレッドシート（Requirement 15）と同一のシート構成・列定義を用いるため、変換ロジック（GoogleSheetsRowMapping）を再利用でき、Admin Config Tool専用の機能として参加者向けMap Viewerのバンドルには影響しない。
-
 ## Architecture
 
 ### High-Level Architecture
@@ -77,7 +75,7 @@ graph TD
 
 ### System Components
 - **Map Viewer App**: 参加者（学生）がスマートフォンブラウザで利用するメインのSPA。地図表示、GNSS現在地、レイヤー切替、POI/ルート表示、観察メモ、URL共有、Googleマップ連携を担う。`project`パラメータ指定時は、公開Googleスプレッドシートからの読み取り専用プロジェクト読み込み（Requirement 16）も行うが、認証情報は一切扱わない。
-- **Admin Config Tool**: 主催者がレイヤー・POI・ルート・メディアリンクを編集するためのローカル実行Webツール（アプリ本体とは別バンドル）。編集結果はJSONファイルとして出力し、Git操作は主催者自身が行う。Googleスプレッドシートとの保存・読み込み（Requirement 15）、エクセルブック（`.xlsx`）のダウンロード・アップロード（Requirement 17）も本ツールにのみ実装する。
+- **Admin Config Tool**: 主催者がレイヤー・POI・ルート・メディアリンクを編集するためのローカル実行Webツール（アプリ本体とは別バンドル）。編集結果はJSONファイルとして出力し、Git操作は主催者自身が行う。Googleスプレッドシートとの保存・読み込み（Requirement 15）も本ツールにのみ実装する。
 - **Config Repository (JSON)**: レイヤー定義・ツアー（実習）単位のPOI/ルート/メディアリンクを保持するバージョン管理対象のJSONファイル群。GitHub Pagesへ実際にデプロイされる正式形式。
 - **Service Worker / Offline Cache**: 閲覧済みタイル・アプリアセットをキャッシュし、圏外時の閲覧継続を支える。
 - **Build & Deploy Pipeline (GitHub Actions)**: push時に静的アセットをビルドし、GitHub Pagesへ自動デプロイする。
@@ -341,23 +339,8 @@ interface GoogleMapsLinkParams {
 - `loadTour(spreadsheetId: string, tourId: string): Promise<TourConfig>`
 - `listAvailableTours(spreadsheetId: string): Promise<{ id: string; title: string }[]>`
 
-### XlsxWorkbookAdapter（Requirement 17、Admin Config Tool専用）
-**Responsibilities:**
-- GoogleSheetsRowMappingが扱う`SheetsData`（シート名をキーとした`string[][]`の集合）と、`.xlsx`ワークブックのバイナリ表現（`ArrayBuffer`）を相互変換する
-- 変換後の`SheetsData`はGoogleSheetsRowMappingの既存関数（`layersToSheet`/`sheetToLayers`, `mergeTourIntoSheets`/`extractTourFromSheets`）にそのまま渡せるため、行⇄オブジェクトの変換ロジックは一切re-implementしない
-
-**設計方針:**
-- `.xlsx`はZIP+XML形式のバイナリであり自前実装は非現実的なため、新規npm依存としてSheetJSの`xlsx`パッケージ（`dependencies`、ブラウザ内で完結する読み書きに対応）を追加する
-- `admin-tool/src/`配下からのみimportし、参加者向け`main.ts`からは一切参照しない。Viteのコード分割により、参加者向け`main.js`バンドルに`xlsx`パッケージが含まれないことをビルド成果物で確認する（GoogleSheetsRowMappingと異なり、本アダプタ自体はAdmin Tool専用の非共有モジュールとする）
-- 読み書きはすべてブラウザ内（`File`/`Blob`/`ArrayBuffer`）で完結し、ファイル内容をいかなるサーバーにも送信しない（Requirement 17.7）
-- レイヤー編集ページは`Layers`単一シートのワークブックを、ツアー編集ページは`Tours`/`POIs`/`Media`/`ReferencePapers`/`Routes`/`RoutePoints`の6シートで構成されるワークブックを扱う。読み込み時のツアー抽出（複数ツアーが1ワークブックに同居する場合の対象ツアーIDによる絞り込み）は、GoogleSheetsProjectServiceの`loadTour`と同じく`extractTourFromSheets`に委譲する
-
-**Key Functions:**
-- `sheetsToWorkbook(sheets: SheetsData, sheetNames: readonly string[]): ArrayBuffer`
-- `workbookToSheets(data: ArrayBuffer, sheetNames: readonly string[]): SheetsData`
-
 ### スプレッドシートのシート（タブ）構成
-1つのGoogleスプレッドシート、または1つの`.xlsx`ワークブックを、正規化されたテーブル群と同様に複数シートへ分割して保持する（Database Schemaで示す将来のテーブル構成と対応させている）。Admin Config Tool（読み書き、Requirement 15・17）とMap Viewer（読み取り専用、Requirement 16）はいずれも同一の構成を前提とする。
+1つのGoogleスプレッドシートを、正規化されたテーブル群と同様に複数シートへ分割して保持する（Database Schemaで示す将来のテーブル構成と対応させている）。Admin Config Tool（読み書き、Requirement 15）とMap Viewer（読み取り専用、Requirement 16）の両方が同一の構成を前提とする。
 
 | シート名 | 列 | 対応する型 |
 | --- | --- | --- |
@@ -570,7 +553,6 @@ repo-root/
 - **外部タイル配信元の一時的エラー（5xx等）**: 一定回数リトライ後、該当ベースレイヤーが利用不可である旨をユーザーに通知し、他のベースレイヤーへの切替を促す。
 - **Googleスプレッドシート連携の失敗（Requirement 15.6）**: OAuth認可拒否・トークン期限切れ、Sheets APIエラー（存在しないスプレッドシートID、権限不足等）、シート形式不正（列欠落・型不一致）のいずれも、Admin Config Tool上にエラーメッセージを表示するに留め、既存のJSONダウンロード等の他機能には影響を与えない。
 - **`project`パラメータでの読み込み失敗（Requirement 16.6）**: スプレッドシートが「ウェブに公開」されていない、IDが誤っている、CSV取得に失敗、シート形式が不正、のいずれの場合も、`showFatalError`等の既存の致命的エラー表示パターンに準じたユーザー向けメッセージを表示し、真っ白な画面のまま停止しない。第三者が作成した未検証のコンテンツを扱うため、POI説明文等は常にDOM APIの`textContent`で描画し、HTML/スクリプトとして解釈しない（Requirement 16.7）。
-- **`.xlsx`ワークブックの読み込み・書き出し失敗（Requirement 17.6）**: 破損ファイル・非対応形式・想定するシート名の欠落等は、Admin Config Tool上にエラーメッセージを表示するに留め、既存のJSON/Googleスプレッドシート連携機能には影響を与えない（Googleスプレッドシート連携と同じエラーハンドリング方針）。
 
 ## Testing Strategy
 - **単体テスト**（Vitest、jsdom環境。2026-07-11時点で287件）:
@@ -582,7 +564,6 @@ repo-root/
   - `GoogleSheetsRowMapping`: レイヤー/ツアーとシート行表現の相互変換（往復一致、他ツアー行の非破壊）
   - `GoogleSheetsProjectService`: OAuth/Sheets API呼び出しをフェイクに差し替えた正常系・異常系（Requirement 15）
   - `PublicSheetProjectLoader`: CSVパースの正常系・異常系（引用符・カンマ・改行を含むフィールド、未公開/形式不正時のフォールバック、Requirement 16）
-  - `XlsxWorkbookAdapter`: `SheetsData`⇄`.xlsx`バイナリの往復一致、想定シート名欠落時の異常系（Requirement 17）。実ファイルのみで完結し外部アカウント等が不要なため、Googleスプレッドシート連携と異なり自動テストのみで完全に検証できる
   - `@vitest/coverage-v8`によるカバレッジ計測（`npm run test:coverage`）。design.mdの方針通り、Leafletとの実結合部分（デフォルトのタイル/マーカー生成関数等）はE2Eで担保する前提のためカバレッジ計測対象から除外している
 - **結合テスト**（Playwright、モバイル端末プロファイル。2026-07-11時点で44件）:
   - レイヤーコントロール操作によるベース/オーバーレイ切替とページ再読み込み後の状態復元（Requirement 2.5）
