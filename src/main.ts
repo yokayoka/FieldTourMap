@@ -14,6 +14,7 @@ import { ObservationMemoStore } from "./services/observationMemoStore";
 import { createMemoPanel } from "./components/memoPanel";
 import { createMemoControl } from "./components/memoControl";
 import type { LayerDefinition, ObservationMemo } from "./types/config";
+import { downloadTextFile } from "./utils/downloadTextFile";
 
 // 初期表示位置は現在地取得（Requirement 1）が成功するまでの暫定フォールバック。
 const DEFAULT_CENTER: L.LatLngExpression = [35.681236, 139.767125];
@@ -168,16 +169,6 @@ function createMemoIcon(): L.DivIcon {
     iconSize: [16, 16],
     iconAnchor: [8, 8],
   });
-}
-
-function downloadTextFile(filename: string, content: string, mimeType: string): void {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
 }
 
 function setupObservationMemos(map: L.Map, root: HTMLElement, bottomControls: HTMLElement): void {

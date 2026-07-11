@@ -123,10 +123,13 @@ Phase 1完了後、8観点（正誤性3・再利用/簡素化/効率3・altitude
   - Playwrightで確認: 地図タップ→メモ作成→ピン表示→タップで内容確認→編集→削除、リロード後の永続化、CSV/GeoJSONダウンロード（ファイル名検証）
   - _Requirements: 5_
 
-- [ ] 13. 🔴 Admin Config Tool: レイヤー編集機能
+- [x] 13. ✅️ Admin Config Tool: レイヤー編集機能
   - レイヤー一覧表示、タイルURL・名称・種別・不透明度・ズーム範囲・attributionの入力フォーム
   - `ConfigValidator`を用いたリアルタイム検証、地図プレビュー表示
   - JSON出力（ダウンロード）機能
+  - 完了メモ: design.mdのFile Storage Structureに従い`admin-tool/`を独立ページとして構築。`vite.config.ts`の`build.rollupOptions.input`をマルチページ化し、`dist/admin-tool/index.html`として出力（base path込みで動作確認済み）。`AdminLayerListStore`（メモリ上のCRUD、8テスト）、`layerEditorForm`（入力フォーム+`ConfigValidator`によるリアルタイム検証+プレビューボタン、8テスト）、`layerListView`（一覧表示、6テスト）をTDD実装し、`src/services/configValidator.ts`・`src/types/config.ts`を`admin-tool/src`からも共有利用。主催者向けツールは公開中の`layers.json`を初期読み込みし、編集後は`layers.json`としてダウンロード（Gitへのコミットは手動）
+  - 発見した不具合: `.layer-editor-form`にCSSで`display: flex`を無条件指定していたため、`hidden`属性を付与してもブラウザ既定の`[hidden] { display: none }`規則より優先されず非表示にならなかった。E2Eテストで発覚し、`.layer-editor-form[hidden] { display: none; }`を明示追加して解消
+  - Playwrightで確認: 公開中layers.jsonの初期表示、新規追加、不正URLでの保存拒否とエラー表示、既存レイヤーの編集・削除、プレビューでの実タイル表示、JSONダウンロード
   - _Requirements: 11, 10_
 
 - [ ] 14. 🔴 Admin Config Tool: POI・ルート・メディア・参考論文編集機能

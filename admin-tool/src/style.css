@@ -1,0 +1,125 @@
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0;
+  padding: 16px;
+  color: #111;
+}
+
+h1 {
+  font-size: 20px;
+}
+
+.admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.admin-toolbar__export {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #fff;
+  color: #111;
+}
+
+.admin-status {
+  min-height: 1.5em;
+  color: #1a5fb4;
+  font-size: 14px;
+}
+
+.admin-main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.admin-preview-map {
+  grid-column: 1 / -1;
+  height: 400px;
+  border: 1px solid #333;
+}
+
+.layer-list-view__add {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #fff;
+  margin-bottom: 8px;
+}
+
+.layer-list-view__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.layer-list-view__item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.layer-list-view__edit,
+.layer-list-view__delete {
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.layer-editor-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid #333;
+  padding: 12px;
+  border-radius: 8px;
+}
+
+/* class側のdisplay:flexがhidden属性のデフォルト非表示を上書きしてしまう
+   ため、明示的にdisplay:noneを指定して正しく隠れるようにする。 */
+.layer-editor-form[hidden] {
+  display: none;
+}
+
+.layer-editor-form__field {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  gap: 4px;
+}
+
+.layer-editor-form__field input,
+.layer-editor-form__field select {
+  min-height: 36px;
+  padding: 4px 8px;
+  font-size: 14px;
+}
+
+.layer-editor-form__errors {
+  color: #b3261e;
+  font-size: 13px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.layer-editor-form__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.layer-editor-form__actions button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #fff;
+}
