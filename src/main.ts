@@ -1,9 +1,9 @@
 import "leaflet/dist/leaflet.css";
 import "./style.css";
 import L from "leaflet";
-import { loadLayers, loadTour } from "./services/configLoader";
+import { loadLayers, loadTour, listAvailableTours } from "./services/configLoader";
 import { LayerManager } from "./services/layerManager";
-import { createLayerControl } from "./components/layerControl";
+import { createLayerControl, type LayerControl } from "./components/layerControl";
 import { GeolocationService, type GeolocationUpdate } from "./services/geolocationService";
 import { createLocationControl } from "./components/locationControl";
 import { PoiRouteOverlay } from "./services/poiRouteOverlay";
@@ -13,8 +13,11 @@ import { createPrecacheControl } from "./components/precacheControl";
 import { ObservationMemoStore } from "./services/observationMemoStore";
 import { createMemoPanel } from "./components/memoPanel";
 import { createMemoControl } from "./components/memoControl";
+import { createTourSelectorControl } from "./components/tourSelectorControl";
+import { createTourSelectorPanel } from "./components/tourSelectorPanel";
 import type { LatLng, LayerDefinition, ObservationMemo } from "./types/config";
 import { downloadTextFile } from "./utils/downloadTextFile";
+import { readSelectedTourId, writeSelectedTourId } from "./utils/tourSelection";
 import { ShareLinkService } from "./services/shareLinkService";
 import { createShareControl } from "./components/shareControl";
 import { GoogleMapsLinkService } from "./services/googleMapsLinkService";
@@ -25,9 +28,6 @@ import { showToast } from "./components/toast";
 // 初期表示位置は現在地取得（Requirement 1）が成功するまでの暫定フォールバック。
 const DEFAULT_CENTER: L.LatLngExpression = [35.681236, 139.767125];
 const DEFAULT_ZOOM = 15;
-
-// Phase 1では単一ツアーの読み込みに固定する（複数ツアー切替はTask 20で対応）。
-const DEFAULT_TOUR_ID = "sample-tour";
 
 export function mountApp(root: HTMLElement): void {
   const mapContainer = document.createElement("div");
@@ -172,7 +172,8 @@ function setupShareControl(
   map: L.Map,
   layerManager: LayerManager,
   getOverlay: () => PoiRouteOverlay | null,
-  root: HTMLElement,
+  getCurrentTourId: () => string | undefined,
+  topControls: HTMLElement,
   shareLinkService: ShareLinkService,
 ): void {
   const control = createShareControl({
@@ -180,6 +181,7 @@ function setupShareControl(
       const center = map.getCenter();
       const layerState = layerManager.getActiveLayerState();
       const poiId = getOverlay()?.getOpenPoiId() ?? undefined;
+      const tourId = getCurrentTourId();
 
       const url = shareLinkService.encode({
         lat: center.lat,
@@ -188,6 +190,7 @@ function setupShareControl(
         baseLayerId: layerState.baseLayerId,
         overlayLayerIds: layerState.overlayLayerIds,
         ...(poiId ? { poiId } : {}),
+        ...(tourId ? { tourId } : {}),
       });
 
       if (await shareLinkService.shareViaWebShareApi(url)) {
@@ -203,10 +206,9 @@ function setupShareControl(
     },
   });
   // POI詳細パネルやメモパネルが画面下部を覆っている間も共有操作を行える
-  // よう、bottom-controlsではなく画面上部に独立して配置する
+  // よう、bottom-controlsではなく画面上部のtopControlsに配置する
   // （Requirement 13.2）。
-  control.root.classList.add("share-control--floating");
-  root.appendChild(control.root);
+  topControls.appendChild(control.root);
 }
 
 /**
@@ -325,18 +327,42 @@ function setupObservationMemos(map: L.Map, root: HTMLElement, bottomControls: HT
   });
 }
 
-async function setupPoiOverlay(
+interface TourSwitchingHandle {
+  getCurrentTourId: () => string | undefined;
+  getOverlay: () => PoiRouteOverlay | null;
+}
+
+interface TourSwitchingInitialState {
+  tourId?: string;
+  poiId?: string;
+  layerOverride?: { baseLayerId: string; overlayLayerIds: string[] };
+}
+
+/**
+ * 複数実習（ツアー）切替機能（Requirement 20）。listAvailableTours()で
+ * 取得したツアー一覧からユーザーが選択でき、選択に応じてPOI/ルート描画
+ * とレイヤー構成（初期値の提案のみ。パネル自体は全レイヤーを引き続き
+ * 表示し、ユーザーは自由に他レイヤーへ切り替えられる）を切り替える。
+ */
+async function setupTourSwitching(
   map: L.Map,
   root: HTMLElement,
-  initialPoiId: string | undefined,
+  topControls: HTMLElement,
+  layerManager: LayerManager,
+  layers: LayerDefinition[],
+  layerControl: LayerControl,
   requestGoogleMapsLink: (point: LatLng) => Promise<void>,
-): Promise<PoiRouteOverlay | null> {
-  let tour;
+  initial: TourSwitchingInitialState,
+): Promise<TourSwitchingHandle> {
+  let availableTours: { id: string; title: string }[] = [];
   try {
-    tour = await loadTour(DEFAULT_TOUR_ID);
+    availableTours = await listAvailableTours();
   } catch (error) {
-    console.warn(`ツアー "${DEFAULT_TOUR_ID}" の読み込みに失敗しました`, error);
-    return null;
+    console.warn("ツアー一覧の取得に失敗しました", error);
+  }
+
+  if (availableTours.length === 0) {
+    return { getCurrentTourId: () => undefined, getOverlay: () => null };
   }
 
   const detailPanel = createPoiDetailPanel(
@@ -346,7 +372,7 @@ async function setupPoiOverlay(
   root.appendChild(detailPanel.root);
 
   // POIの参照はoverlay.getPoiById()経由で行う。tour変数を直接クロージャで
-  // 保持すると、将来renderTour()が別のツアーで再度呼ばれた際に古いツアーの
+  // 保持すると、renderTour()が別のツアーで再度呼ばれた際に古いツアーの
   // POI配列を参照し続けてしまうため。
   const overlay = new PoiRouteOverlay({
     map,
@@ -360,15 +386,101 @@ async function setupPoiOverlay(
     },
   });
 
-  overlay.renderTour(tour);
+  let currentTourId: string | undefined;
 
-  // 共有URLにPOI IDが含まれていた場合、そのPOI詳細を自動的に開く
-  // （Requirement 13.2）。
-  if (initialPoiId && overlay.getPoiById(initialPoiId)) {
-    overlay.openPoiDetail(initialPoiId);
+  const selectorPanel = createTourSelectorPanel({
+    // パネルからの明示的な切替時は、地図をそのツアーのPOI範囲へ再センタリング
+    // する（Requirement 20: 切替UX改善）。初期読み込み時は既存の現在地・
+    // 共有ビュー復元ロジックを優先させるため対象外とする。
+    onSelect: (tourId) => void selectTour(tourId, { isExplicitSwitch: true }),
+    onClose: () => {},
+  });
+  root.appendChild(selectorPanel.root);
+
+  const selectorControl = createTourSelectorControl({
+    onOpen: () => selectorPanel.show(availableTours, currentTourId ?? null),
+  });
+  topControls.appendChild(selectorControl.root);
+
+  async function selectTour(
+    tourId: string,
+    options: { poiId?: string; isExplicitSwitch?: boolean } = {},
+  ): Promise<void> {
+    let tour;
+    try {
+      tour = await loadTour(tourId);
+    } catch (error) {
+      console.warn(`ツアー "${tourId}" の読み込みに失敗しました`, error);
+      return;
+    }
+
+    currentTourId = tourId;
+    overlay.renderTour(tour);
+    selectorControl.setTitle(tour.title);
+    writeSelectedTourId(window.localStorage, tourId);
+
+    // ツアーのlayerIdsから初期値を提案する（レイヤーパネル自体は全レイヤー
+    // を引き続き表示し、ユーザーは自由に他レイヤーへ切り替えられる）。
+    // ユーザーが明示的にツアーを切り替えた場合のみ適用し、通常の再読み込み
+    // 時はLayerManagerが復元する永続化済みレイヤー状態を優先する
+    // （Requirement 2.5との両立）。
+    if (options.isExplicitSwitch) {
+      const suggestedBase = tour.layerIds.find(
+        (id) => layers.find((layer) => layer.id === id)?.type === "base",
+      );
+      if (suggestedBase) layerManager.setBaseLayer(suggestedBase);
+      layers
+        .filter((layer) => layer.type === "overlay")
+        .forEach((layer) => {
+          layerManager.toggleOverlay(layer.id, tour.layerIds.includes(layer.id));
+        });
+      layerControl.refresh();
+
+      if (tour.pois.length > 0) {
+        const bounds = L.latLngBounds(
+          tour.pois.map((poi): L.LatLngTuple => [poi.position.lat, poi.position.lng]),
+        );
+        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 17 });
+      }
+    }
+
+    if (options.poiId && overlay.getPoiById(options.poiId)) {
+      overlay.openPoiDetail(options.poiId);
+    }
   }
 
-  return overlay;
+  const persistedTourId = readSelectedTourId(window.localStorage);
+  const isKnownTour = (id: string | null): id is string =>
+    id !== null && availableTours.some((tour) => tour.id === id);
+  // 共有URLで指定されたツアー（Requirement 13）を最優先とし、次に
+  // 前回選択したツアー、いずれも無効なら一覧の先頭のツアーを使う。
+  const initialTourId =
+    (isKnownTour(initial.tourId ?? null) ? initial.tourId! : undefined) ??
+    (isKnownTour(persistedTourId) ? persistedTourId : undefined) ??
+    availableTours[0].id;
+
+  await selectTour(initialTourId, { poiId: initial.poiId });
+
+  // 共有URLに明示的なレイヤー構成が含まれていた場合は、ツアーの提案より
+  // 優先して適用する（Requirement 13.4, 13.7）。
+  if (initial.layerOverride) {
+    const validLayerIds = new Set(layers.map((layer) => layer.id));
+    if (validLayerIds.has(initial.layerOverride.baseLayerId)) {
+      layerManager.setBaseLayer(initial.layerOverride.baseLayerId);
+    }
+    const overlayIds = initial.layerOverride.overlayLayerIds;
+    layers
+      .filter((layer) => layer.type === "overlay")
+      .forEach((layer) => {
+        layerManager.toggleOverlay(layer.id, overlayIds.includes(layer.id));
+      });
+    layerControl.refresh();
+  }
+
+  return {
+    getCurrentTourId: () => currentTourId,
+    getOverlay: () => overlay,
+  };
 }
 
 export async function initializeMap(root: HTMLElement, mapContainer: HTMLElement): Promise<void> {
@@ -396,36 +508,53 @@ export async function initializeMap(root: HTMLElement, mapContainer: HTMLElement
   bottomControls.className = "bottom-controls";
   root.appendChild(bottomControls);
 
+  // POI詳細パネルやメモパネルが画面下部を覆っていても常に操作できる
+  // コントロール（共有・ツアー切替）をまとめる、画面右上のフローティング
+  // 領域（Requirement 13.2, 20）。Leafletのデフォルトズームコントロール
+  // （左上）とは重ならない。
+  const topControls = document.createElement("div");
+  topControls.className = "top-controls";
+  root.appendChild(topControls);
+
   setupLocationTracking(map, bottomControls);
 
   const layers = await loadLayers();
   const layerManager = new LayerManager({ map, layers, storage: window.localStorage });
-
-  // 共有URLで指定されたレイヤー構成を適用する。存在しないレイヤーIDは
-  // 無視し、通常のデフォルト/永続化済み状態のまま継続する
-  // （Requirement 13.4, 13.7）。
-  if (sharedState) {
-    const validLayerIds = new Set(layers.map((layer) => layer.id));
-    if (validLayerIds.has(sharedState.baseLayerId)) {
-      layerManager.setBaseLayer(sharedState.baseLayerId);
-    }
-    layers
-      .filter((layer) => layer.type === "overlay")
-      .forEach((layer) => {
-        layerManager.toggleOverlay(layer.id, sharedState.overlayLayerIds.includes(layer.id));
-      });
-  }
-
   const layerControl = createLayerControl(layers, layerManager);
-  bottomControls.appendChild(layerControl);
-  setupPrecacheControl(map, layerManager, layers, layerControl, offlineCacheService);
+  bottomControls.appendChild(layerControl.root);
+  setupPrecacheControl(map, layerManager, layers, layerControl.root, offlineCacheService);
   setupObservationMemos(map, root, bottomControls);
 
-  let poiOverlay: PoiRouteOverlay | null = null;
-  setupShareControl(map, layerManager, () => poiOverlay, root, shareLinkService);
   const googleMapsLink = setupGoogleMapsLinkFeature(map, root, bottomControls);
 
-  poiOverlay = await setupPoiOverlay(map, root, sharedState?.poiId, googleMapsLink.requestLink);
+  // ツアー選択・POI/ルート描画・（提案としての）レイヤー構成の切替
+  // （Requirement 20）。共有URLにツアーID・明示的なレイヤー構成が含まれて
+  // いれば、ツアーの提案よりも優先して復元する（Requirement 13.4, 13.7）。
+  const tourSwitching = await setupTourSwitching(
+    map,
+    root,
+    topControls,
+    layerManager,
+    layers,
+    layerControl,
+    googleMapsLink.requestLink,
+    {
+      tourId: sharedState?.tourId,
+      poiId: sharedState?.poiId,
+      layerOverride: sharedState
+        ? { baseLayerId: sharedState.baseLayerId, overlayLayerIds: sharedState.overlayLayerIds }
+        : undefined,
+    },
+  );
+
+  setupShareControl(
+    map,
+    layerManager,
+    tourSwitching.getOverlay,
+    tourSwitching.getCurrentTourId,
+    topControls,
+    shareLinkService,
+  );
 }
 
 const appRoot = document.querySelector<HTMLDivElement>("#app");

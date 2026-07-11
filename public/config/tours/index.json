@@ -2,5 +2,9 @@
   {
     "id": "sample-tour",
     "title": "サンプル巡検コース"
+  },
+  {
+    "id": "second-tour",
+    "title": "第二巡検コース（海岸地形）"
   }
 ]

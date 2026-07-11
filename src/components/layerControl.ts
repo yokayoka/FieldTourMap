@@ -7,10 +7,16 @@ export interface LayerControlManager {
   getActiveLayerState(): ActiveLayerState;
 }
 
+export interface LayerControl {
+  root: HTMLElement;
+  /** マネージャーの状態がコントロール外（ツアー切替等）から変更された際に、表示を再同期する。 */
+  refresh(): void;
+}
+
 export function createLayerControl(
   layers: LayerDefinition[],
   manager: LayerControlManager,
-): HTMLElement {
+): LayerControl {
   const root = document.createElement("div");
   root.className = "layer-control";
 
@@ -19,13 +25,17 @@ export function createLayerControl(
   baseSection.setAttribute("role", "radiogroup");
 
   const baseButtons = new Map<string, HTMLButtonElement>();
+  const overlayCheckboxes = new Map<string, HTMLInputElement>();
 
-  const refreshBaseButtons = (): void => {
-    const { baseLayerId } = manager.getActiveLayerState();
+  const refresh = (): void => {
+    const { baseLayerId, overlayLayerIds } = manager.getActiveLayerState();
     baseButtons.forEach((button, layerId) => {
       const active = layerId === baseLayerId;
       button.classList.toggle("layer-control__button--active", active);
       button.setAttribute("aria-pressed", String(active));
+    });
+    overlayCheckboxes.forEach((checkbox, layerId) => {
+      checkbox.checked = overlayLayerIds.includes(layerId);
     });
   };
 
@@ -39,7 +49,7 @@ export function createLayerControl(
       button.setAttribute("role", "radio");
       button.addEventListener("click", () => {
         manager.setBaseLayer(layer.id);
-        refreshBaseButtons();
+        refresh();
       });
       baseButtons.set(layer.id, button);
       baseSection.appendChild(button);
@@ -62,14 +72,15 @@ export function createLayerControl(
         manager.toggleOverlay(layer.id, checkbox.checked);
       });
 
+      overlayCheckboxes.set(layer.id, checkbox);
       label.appendChild(checkbox);
       label.append(layer.name);
       overlaySection.appendChild(label);
     });
 
-  refreshBaseButtons();
+  refresh();
 
   root.appendChild(baseSection);
   root.appendChild(overlaySection);
-  return root;
+  return { root, refresh };
 }

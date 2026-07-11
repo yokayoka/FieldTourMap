@@ -59,4 +59,24 @@ describe("public/config/tours/index.json", () => {
     const index = readJson<{ id: string; title: string }[]>("tours/index.json");
     expect(index.some((entry) => entry.id === "sample-tour")).toBe(true);
   });
+
+  it("lists at least two tours (Requirement 20: 複数実習ツアー切替)", () => {
+    const index = readJson<{ id: string; title: string }[]>("tours/index.json");
+    expect(index.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("every listed tour resolves to a valid tour config file", () => {
+    const index = readJson<{ id: string; title: string }[]>("tours/index.json");
+    const layers = readJson<LayerDefinition[]>("layers.json");
+    const validLayerIds = new Set(layers.map((layer) => layer.id));
+
+    index.forEach((entry) => {
+      const tour = readJson<TourConfig>(`tours/${entry.id}.json`);
+      const result = validateTourConfig(tour);
+      expect(result.errors).toEqual([]);
+      expect(result.valid).toBe(true);
+      expect(tour.id).toBe(entry.id);
+      tour.layerIds.forEach((id) => expect(validLayerIds.has(id)).toBe(true));
+    });
+  });
 });

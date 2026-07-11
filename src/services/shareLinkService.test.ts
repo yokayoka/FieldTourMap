@@ -38,6 +38,23 @@ describe("ShareLinkService", () => {
       expect(decoded).toEqual(state);
     });
 
+    it("round-trips a tourId when present", () => {
+      const service = new ShareLinkService({ baseUrl: BASE_URL });
+      const state: ShareViewState = {
+        lat: 35.68,
+        lng: 139.76,
+        zoom: 16,
+        baseLayerId: "osm",
+        overlayLayerIds: [],
+        tourId: "second-tour",
+        poiId: "poi-01",
+      };
+
+      const decoded = service.decode(service.encode(state));
+
+      expect(decoded).toEqual(state);
+    });
+
     it("produces a URL rooted at the configured base URL", () => {
       const service = new ShareLinkService({ baseUrl: BASE_URL });
       const url = service.encode({

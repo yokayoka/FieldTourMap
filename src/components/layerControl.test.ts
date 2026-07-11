@@ -57,7 +57,7 @@ function createFakeManager(initialOverlayIds: string[] = []): LayerControlManage
 describe("createLayerControl", () => {
   it("renders one button per base layer and one checkbox per overlay layer", () => {
     const manager = createFakeManager();
-    const root = createLayerControl(layers, manager);
+    const { root } = createLayerControl(layers, manager);
 
     expect(root.querySelectorAll(".layer-control__button")).toHaveLength(2);
     expect(root.querySelectorAll(".layer-control__checkbox")).toHaveLength(1);
@@ -65,7 +65,7 @@ describe("createLayerControl", () => {
 
   it("marks the initially active base layer button", () => {
     const manager = createFakeManager();
-    const root = createLayerControl(layers, manager);
+    const { root } = createLayerControl(layers, manager);
 
     const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>(".layer-control__button"));
     const active = buttons.find((b) => b.classList.contains("layer-control__button--active"));
@@ -75,7 +75,7 @@ describe("createLayerControl", () => {
 
   it("reflects initial overlay checked state from the manager", () => {
     const manager = createFakeManager(["aist-geology"]);
-    const root = createLayerControl(layers, manager);
+    const { root } = createLayerControl(layers, manager);
 
     const checkbox = root.querySelector<HTMLInputElement>(".layer-control__checkbox");
     expect(checkbox?.checked).toBe(true);
@@ -83,7 +83,7 @@ describe("createLayerControl", () => {
 
   it("calls setBaseLayer and updates the active button when a base layer button is clicked", () => {
     const manager = createFakeManager();
-    const root = createLayerControl(layers, manager);
+    const { root } = createLayerControl(layers, manager);
 
     const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>(".layer-control__button"));
     const osmButton = buttons.find((b) => b.textContent === "OpenStreetMap")!;
@@ -96,12 +96,30 @@ describe("createLayerControl", () => {
 
   it("calls toggleOverlay with the checkbox state when clicked", () => {
     const manager = createFakeManager();
-    const root = createLayerControl(layers, manager);
+    const { root } = createLayerControl(layers, manager);
 
     const checkbox = root.querySelector<HTMLInputElement>(".layer-control__checkbox")!;
     checkbox.checked = true;
     checkbox.dispatchEvent(new Event("change"));
 
     expect(manager.toggleOverlay).toHaveBeenCalledWith("aist-geology", true);
+  });
+
+  it("refresh() re-syncs base button and overlay checkbox state after external manager changes", () => {
+    const manager = createFakeManager();
+    const { root, refresh } = createLayerControl(layers, manager);
+
+    // ツアー切替等、コントロールのクリックを介さずマネージャーの状態が
+    // 外部から変更されるケースを想定する。
+    manager.setBaseLayer("osm");
+    manager.toggleOverlay("aist-geology", true);
+    refresh();
+
+    const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>(".layer-control__button"));
+    const osmButton = buttons.find((b) => b.textContent === "OpenStreetMap")!;
+    expect(osmButton.classList.contains("layer-control__button--active")).toBe(true);
+
+    const checkbox = root.querySelector<HTMLInputElement>(".layer-control__checkbox")!;
+    expect(checkbox.checked).toBe(true);
   });
 });

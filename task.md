@@ -191,10 +191,18 @@ Phase 1完了後、8観点（正誤性3・再利用/簡素化/効率3・altitude
   - 既知のスコープ限定: PWA化は参加者向けMap Viewer（`index.html`）のみを対象とし、主催者向けAdmin Config Tool（`admin-tool/`）はホーム画面インストール対象外とした（design.mdのファイル構成上も参加者向けアプリのみがオフライン運用対象であるため）
   - _Requirements: 6, 7_
 
-- [ ] 20. 🔴 複数実習（ツアー）切替UIの実装
+- [x] 20. ✅️ 複数実習（ツアー）切替UIの実装
   - `listAvailableTours()`を用いたツアー選択画面の実装
   - 選択したツアーのPOI・ルート・レイヤー構成への切替UX改善
+  - 設計判断の確認: `TourConfig.layerIds`はサンプルデータ上ベースレイヤー3種+オーバーレイ1種を含み「このツアーで使える候補一覧」と解釈できたため、ユーザーに方針を確認。ツアー切替時は「初期値の提案のみ」を採用し、`layerIds`内の最初のbaseレイヤーと該当するoverlayレイヤーを自動選択するが、レイヤーパネル自体は引き続き全レイヤーを表示しユーザーは自由に他レイヤーへ切り替えられる設計とした
+  - 完了メモ: `src/utils/tourSelection.ts`（選択中ツアーIDのlocalStorage永続化、4テスト）、`src/components/tourSelectorPanel.ts`（ツアー一覧の下部シート、5テスト）、`src/components/tourSelectorControl.ts`（現在のツアー名を表示するトグルボタン、3テスト）をTDD実装。`layerControl.ts`は外部からのレイヤー状態変更をUIへ反映する`refresh()`を追加できるよう`{root, refresh}`を返す形に変更（1テスト追加、呼び出し側`main.ts`・テストを対応するAPIに更新）。`ShareViewState`/`ShareLinkService`に`tourId`を追加し、共有URLが「どのツアーの、どのPOIか」まで復元できるよう拡張（1テスト追加）
+  - `main.ts`の`setupPoiOverlay()`を`setupTourSwitching()`へ再設計。共有URLのツアーID→前回選択（localStorage）→一覧先頭、の優先順でツアーを解決し、共有URLに明示的なレイヤー構成が含まれる場合はツアーの提案より優先して復元する（Requirement 13.4, 13.7との両立）
+  - サンプルデータとして`public/config/tours/second-tour.json`（海岸地形テーマ、layerIds=["osm","gsi-photo"]でサンプルツアーとは異なるベースレイヤーを提案）を追加し、`tours/index.json`に登録。`sampleConfig.test.ts`に「index.jsonに列挙された全ツアーが検証を通過する」テストを追加し、将来ツアーが増えても自動的に検証対象になるようにした
+  - 発見・修正した不具合（2件）: (1) 新設した左上フローティングのツアー切替ボタンがLeaflet既定のズームコントロール（左上）と、次いでbottom-controls内の`layer-control`（`align-self:stretch`で全幅表示のためbottom-left/right両隅を実質占有）と衝突し、E2Eテストでクリック不能を検出。共有コントロールと合わせて画面右上に共通の`.top-controls`フレックスコンテナへ統合し、Task 8/12と同じ「固定px値でなくflexboxで積み上げる」方針で解消した。(2) ツアーのlayerIds提案ロジックを初期読み込み時にも無条件適用していたため、リロード時にLayerManagerが復元した永続化済みレイヤー状態（Requirement 2.5）を上書きしてしまう回帰をE2Eテストで検出。ユーザーが切替パネルから明示的にツアーを選択した場合のみレイヤー提案・地図再センタリングを適用するよう修正し、通常のリロード時はLayerManagerの永続化状態を優先するよう分離した
+  - Playwrightで確認: 初期表示は一覧先頭のツアー、切替パネルでの一覧表示とアクティブ表示、別ツアー選択時のPOI再描画・レイヤー提案適用・地図再センタリング、リロード後の選択保持、共有URLでのツアーID+POI ID往復（別セッションでの復元）
   - _Requirements: 4, 10_
+
+**Phase 3 (高度な機能) 完了**: タスク17〜20すべて完了。大量POI描画のパフォーマンス確認・Lighthouse CI（既知の制約: `NO_FCP`問題によりレポート未生成、Task 17完了メモ参照）・セキュリティ/プライバシーレビューとポリシー文書化・PWA対応（ホーム画面インストール）・複数実習ツアー切替UIがGitHub Pages上で動作し、単体テスト260件・E2Eテスト41件がCIで継続的に検証される状態になった。
 
 ## Phase 4: 本番化対応
 
