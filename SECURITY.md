@@ -74,7 +74,7 @@ Requirement 16により、参加者向けMap Viewerは`?project=<スプレッド
 | メディア/参考文献リンクの`javascript:`スキームによるクリックスルーXSS | `ConfigValidator.validateMediaLink`/`validateReferencePaper`が`http(s)://`で始まるURLのみを許可し、それ以外のスキームは検証エラーとして読み込み自体を拒否する（`configLoader.ts`はローカルJSON・スプレッドシート経由のいずれの読み込みでも同一のバリデーションを通す） |
 | レイヤーのタイルURL（`urlTemplate`）を経由した参加者の概略位置・IPアドレスの第三者タイル配信元への漏出 | 地図タイルの仕組み上不可避のリスクであり、コードでは緩和していない。主催者は、信頼できる相手が公開したプロジェクトURLのみを参加者に共有すること（本ドキュメントおよび`docs/organizer-guide.md`で注意喚起） |
 | 破損・非公開化されたスプレッドシートによる表示失敗 | `PublicSheetProjectLoader`の読み込み失敗はアプリ全体のクラッシュではなく「プロジェクトの読み込みに失敗しました」というエラーバナー表示に留める（Requirement 16.6） |
-| OAuthアクセストークン等の認証情報の漏出 | 参加者向けMap Viewerの読み込み経路（`PublicSheetProjectLoader`）はOAuthを一切使用しない読み取り専用の公開CSVエンドポイントのみを利用するため、そもそも参加者のブラウザに認証情報が存在しない。OAuthアクセストークンを扱うのはAdmin Config Tool専用の`GoogleSheetsProjectService`であり、これはメモリ上にのみ保持し外部送信・永続化しない |
+| 認証情報の漏出 | 参加者向けMap Viewerの読み込み経路（`PublicSheetProjectLoader`）はOAuth・APIキー等の認証情報を一切使用しない読み取り専用の公開CSVエンドポイントのみを利用するため、そもそも参加者のブラウザに認証情報が存在しない。本アプリはいかなる経路でもGoogleスプレッドシートへの書き込みを行わないため、OAuth等の認証情報自体を扱うコードが存在しない（Requirement 15） |
 
 以上より、第三者作成プロジェクトの読み込みは「未検証の任意コンテンツをテキストとして
 表示する」範囲に限定されており、スクリプト実行や認証情報漏出には至らない設計となって

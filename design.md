@@ -3,7 +3,7 @@
 ## Overview
 本システムは、地理学・地質学の野外教育を支援するスマートフォン向けWebGIS（Leafletベース）であり、Phase 1ではサーバーを持たないGitHub Pages上の静的SPA（Single Page Application）として構築する。レイヤー構成・見学ポイント（POI）・巡検ルート・メディアリンクはリポジトリ内のJSON設定ファイルとして管理し、主催者はローカルの管理用Webツールでこれらを編集してGitにコミット・プッシュすることでサイトへ反映する。GNSS位置表示、オフラインタイルキャッシュ、URL共有、Googleマップ連携リンクなど、参加者側の機能はすべてクライアントサイド（ブラウザ）で完結させ、外部サービス（タイル配信元、Google Drive/Dropbox、Googleマップ、X/LINE）とは疎結合な連携（リンク遷移・fetch）のみを行う。
 
-Requirement 15・16により、GitHubを使わない第三者の主催者も本アプリを流用できる。主催者はGoogleスプレッドシート上でレイヤー・ツアーを編集し（Admin Config ToolからOAuth経由で読み書き）、スプレッドシートを「ウェブに公開」設定した上でそのIDをURLパラメータ（`?project=<spreadsheetId>`）として参加者に共有する。参加者向けMap Viewerはこのパラメータを検出すると、GitHubリポジトリのフォーク・デプロイなしに、認証情報を一切使わない公開CSV読み取りのみでそのプロジェクトを表示する。
+Requirement 15・16により、GitHubを使わない第三者の主催者も本アプリを流用できる。主催者はAdmin Config Toolで編集したJSONの内容を、Requirement 15で定義したシート構成に沿って自分自身の手作業でGoogleスプレッドシートへ転記し、スプレッドシートを「ウェブに公開」設定した上でそのIDをURLパラメータ（`?project=<spreadsheetId>`）として参加者に共有する。参加者向けMap Viewerはこのパラメータを検出すると、GitHubリポジトリのフォーク・デプロイなしに、認証情報を一切使わない公開CSV読み取りのみでそのプロジェクトを表示する。本アプリはいかなる経路でもGoogleスプレッドシートへの書き込みを行わず、OAuth等の認証情報も一切扱わない（主催者にGoogle Cloud ConsoleでのOAuthクライアントID発行等、難易度の高いセットアップを要求しないための設計判断）。
 
 ## Architecture
 
@@ -45,11 +45,9 @@ graph TD
         DriveDropbox["Google Drive / Dropbox<br/>写真・動画"]
         GoogleMaps["Google マップ (アプリ/Web)"]
         SNS["X / LINE 等 SNS"]
-        GSheets["Google Sheets API<br/>(OAuth 2.0, Admin Tool専用)"]
         PublicCSV["公開CSVエンドポイント<br/>(認証不要, Map Viewer用)"]
     end
 
-    AdminTool -- "OAuth認可・読み書き" --> GSheets
     AdminTool -- "編集・出力" --> ConfigSrc
     ConfigSrc -- "commit / push" --> REPO
     SrcCode -- "commit / push" --> REPO
@@ -75,11 +73,11 @@ graph TD
 
 ### System Components
 - **Map Viewer App**: 参加者（学生）がスマートフォンブラウザで利用するメインのSPA。地図表示、GNSS現在地、レイヤー切替、POI/ルート表示、観察メモ、URL共有、Googleマップ連携を担う。`project`パラメータ指定時は、公開Googleスプレッドシートからの読み取り専用プロジェクト読み込み（Requirement 16）も行うが、認証情報は一切扱わない。
-- **Admin Config Tool**: 主催者がレイヤー・POI・ルート・メディアリンクを編集するためのローカル実行Webツール（アプリ本体とは別バンドル）。編集結果はJSONファイルとして出力し、Git操作は主催者自身が行う。Googleスプレッドシートとの保存・読み込み（Requirement 15）も本ツールにのみ実装する。
+- **Admin Config Tool**: 主催者がレイヤー・POI・ルート・メディアリンクを編集するためのローカル実行Webツール（アプリ本体とは別バンドル）。編集結果はJSONファイルとして出力し、Git操作は主催者自身が行う。Googleスプレッドシートへの転記（Requirement 15）は自動化せず、主催者自身の手作業で行う。
 - **Config Repository (JSON)**: レイヤー定義・ツアー（実習）単位のPOI/ルート/メディアリンクを保持するバージョン管理対象のJSONファイル群。GitHub Pagesへ実際にデプロイされる正式形式。
 - **Service Worker / Offline Cache**: 閲覧済みタイル・アプリアセットをキャッシュし、圏外時の閲覧継続を支える。
 - **Build & Deploy Pipeline (GitHub Actions)**: push時に静的アセットをビルドし、GitHub Pagesへ自動デプロイする。
-- **External Integrations**: 地図タイル配信元、Google Drive/Dropbox（メディアリンク）、Googleマップ（地点リンク）、Web Share API経由のSNS連携、Google Sheets API（Admin Config Toolのみ、OAuth 2.0経由でのプロジェクト編集用中間フォーマット、Requirement 15）。
+- **External Integrations**: 地図タイル配信元、Google Drive/Dropbox（メディアリンク）、Googleマップ（地点リンク）、Web Share API経由のSNS連携、Googleスプレッドシートの公開CSVエンドポイント（Map Viewer専用、認証不要、Requirement 16）。
 
 ## Components and Interfaces
 
@@ -294,34 +292,16 @@ interface GoogleMapsLinkParams {
 - 地図プレビューは各ページの`main.ts`（`admin-tool/src/main.ts`, `admin-tool/src/tourEditorMain.ts`）がLeafletインスタンスを直接操作して実現（上記`previewOnMap`に相当）
 - `adminNav`: 2ページ間の移動用共有ナビゲーション
 
-### GoogleSheetsRowMapping（共有ライブラリ：Admin Tool / Map Viewer 双方で利用）
+### GoogleSheetsRowMapping（共有ライブラリ：Map Viewer専用）
 **Responsibilities:**
 - `LayerDefinition[]`・`TourConfig`（POI/メディア/参考文献/ルート/ルート頂点）と、スプレッドシートの複数シート（タブ）の行表現との相互変換。認証情報やネットワークI/Oを一切含まない純粋な変換ロジック
-- `mergeTourIntoSheets`は対象`tour.id`の行のみを置換し、他ツアーの行は保持する（既存シートへの非破壊マージ）
+- `mergeTourIntoSheets`は対象`tour.id`の行のみを置換し、他ツアーの行は保持する（既存シートへの非破壊マージ）。この関数自体はMap Viewer側では未使用だが、`extractTourFromSheets`と対になる変換ロジックとしてテスト（往復一致確認）・サンプルデータ生成の両方で利用する
 
-認証・I/Oを伴わない純粋関数であるため、`ConfigValidator`同様Admin Config Tool（書き込み用）とMap Viewer（読み取り用、Requirement 16）の双方から利用する共有モジュールとして実装する。
+認証・I/Oを伴わない純粋関数であり、`ConfigValidator`同様、`PublicSheetProjectLoader`（Requirement 16の読み取り用）から利用する共有モジュールとして実装する。主催者がGoogleスプレッドシートへ手作業で転記する際の列構成の基準（Requirement 15.1）としても、このモジュールが定義する列名がそのまま正となる。
 
 **Key Functions:**
 - `layersToSheet(layers): string[][]` / `sheetToLayers(rows): LayerDefinition[]`
 - `mergeTourIntoSheets(existing, tour): SheetsData` / `extractTourFromSheets(sheets, tourId): TourConfig | null`
-
-### GoogleSheetsProjectService（Requirement 15、Admin Config Tool専用）
-**Responsibilities:**
-- Google Identity Services（GIS）を用いたOAuth 2.0認可（アクセストークン取得）。主催者自身のGoogle CloudプロジェクトのOAuthクライアントIDを設定画面で入力し利用する
-- Google Sheets API v4（REST、`fetch`による直接呼び出し）を用いた、指定スプレッドシートへの読み書き（GoogleSheetsRowMappingで変換）
-
-**設計方針:**
-- Google製の重量級クライアントライブラリ（`gapi`）は使わず、GIS（`https://accounts.google.com/gsi/client`をAdmin Toolページに動的読み込み）でトークンを取得し、以降は`fetch()`でSheets API RESTエンドポイントを直接呼び出す。新規npm依存を追加しない
-- OAuthスコープは`https://www.googleapis.com/auth/spreadsheets`（読み書き）。主催者が指定した既存スプレッドシートIDを読み込む必要がある（Requirement 15.2）ため、作成元がアプリに限定される`drive.file`スコープでは要件を満たせないと判断した
-- OAuthを用いた読み書きはAdmin Config Tool（ローカル実行）専用とし、参加者向けMap Viewerには一切組み込まない（Requirement 15.7）。OAuthクライアントID・トークンはAdmin Config Toolのブラウザメモリ/localStorageにのみ保持し、リポジトリにコミットしない
-
-**Key Methods:**
-- `authorize(clientId: string): Promise<boolean>`
-- `isAuthorized(): boolean`
-- `saveLayers(spreadsheetId: string, layers: LayerDefinition[]): Promise<void>`
-- `loadLayers(spreadsheetId: string): Promise<LayerDefinition[]>`
-- `saveTour(spreadsheetId: string, tour: TourConfig): Promise<void>`
-- `loadTour(spreadsheetId: string, tourId: string): Promise<TourConfig>`
 
 ### PublicSheetProjectLoader（Requirement 16、Map Viewer専用）
 **Responsibilities:**
@@ -340,7 +320,7 @@ interface GoogleMapsLinkParams {
 - `listAvailableTours(spreadsheetId: string): Promise<{ id: string; title: string }[]>`
 
 ### スプレッドシートのシート（タブ）構成
-1つのGoogleスプレッドシートを、正規化されたテーブル群と同様に複数シートへ分割して保持する（Database Schemaで示す将来のテーブル構成と対応させている）。Admin Config Tool（読み書き、Requirement 15）とMap Viewer（読み取り専用、Requirement 16）の両方が同一の構成を前提とする。
+1つのGoogleスプレッドシートを、正規化されたテーブル群と同様に複数シートへ分割して保持する（Database Schemaで示す将来のテーブル構成と対応させている）。主催者が手作業で作成・編集するスプレッドシート（Requirement 15）とMap Viewer（読み取り専用、Requirement 16）の両方が同一の構成を前提とする。
 
 | シート名 | 列 | 対応する型 |
 | --- | --- | --- |
@@ -551,7 +531,6 @@ repo-root/
 - **クリップボードAPI非対応（Requirement 14.6）**: `navigator.clipboard`が利用不可の場合、生成したURLをテキストとして選択可能な入力欄に表示し、手動コピーを促す。
 - **Service Worker登録失敗**: キャッシュ機能なしで通常のネットワーク経由動作にフォールバックし、アプリの起動自体は継続する。
 - **外部タイル配信元の一時的エラー（5xx等）**: 一定回数リトライ後、該当ベースレイヤーが利用不可である旨をユーザーに通知し、他のベースレイヤーへの切替を促す。
-- **Googleスプレッドシート連携の失敗（Requirement 15.6）**: OAuth認可拒否・トークン期限切れ、Sheets APIエラー（存在しないスプレッドシートID、権限不足等）、シート形式不正（列欠落・型不一致）のいずれも、Admin Config Tool上にエラーメッセージを表示するに留め、既存のJSONダウンロード等の他機能には影響を与えない。
 - **`project`パラメータでの読み込み失敗（Requirement 16.6）**: スプレッドシートが「ウェブに公開」されていない、IDが誤っている、CSV取得に失敗、シート形式が不正、のいずれの場合も、`showFatalError`等の既存の致命的エラー表示パターンに準じたユーザー向けメッセージを表示し、真っ白な画面のまま停止しない。第三者が作成した未検証のコンテンツを扱うため、POI説明文等は常にDOM APIの`textContent`で描画し、HTML/スクリプトとして解釈しない（Requirement 16.7）。
 
 ## Testing Strategy
@@ -562,7 +541,6 @@ repo-root/
   - `ObservationMemoStore`: CRUD操作、CSV/GeoJSONエクスポート内容の妥当性
   - `LayerManager`: レイヤー切替状態のlocalStorage永続化・復元
   - `GoogleSheetsRowMapping`: レイヤー/ツアーとシート行表現の相互変換（往復一致、他ツアー行の非破壊）
-  - `GoogleSheetsProjectService`: OAuth/Sheets API呼び出しをフェイクに差し替えた正常系・異常系（Requirement 15）
   - `PublicSheetProjectLoader`: CSVパースの正常系・異常系（引用符・カンマ・改行を含むフィールド、未公開/形式不正時のフォールバック、Requirement 16）
   - `@vitest/coverage-v8`によるカバレッジ計測（`npm run test:coverage`）。design.mdの方針通り、Leafletとの実結合部分（デフォルトのタイル/マーカー生成関数等）はE2Eで担保する前提のためカバレッジ計測対象から除外している
 - **結合テスト**（Playwright、モバイル端末プロファイル。2026-07-11時点で44件）:
@@ -575,4 +553,4 @@ repo-root/
   - Lighthouse CI（`lighthouserc.json`、非ブロッキング）による初回表示速度計測を試みたが、本アプリのページに対し`NO_FCP`エラーで失敗しレポートが生成できていない（既知の制約、詳細はtask.mdのTask 17完了メモ参照）。代替として、Playwright E2Eで実際の公開設定を用いた通常規模の初期表示時間・大量POI（150件）描画時の初期表示時間をそれぞれ計測し、3秒以内（Requirement 7.1）であることを回帰テストとして固定している
 - **CI**（GitHub Actions）:
   - push時にlint・型チェック・単体テスト・E2Eテスト・ビルドを実行し、失敗時はGitHub Pagesへのデプロイをブロックする（Requirement 9.3, 12.3）。Lighthouse CIのみ計測値が外部タイル配信元の応答速度に左右されるため非ブロッキング（`continue-on-error: true`）とする
-- **手動検証が必要な範囲**: 実際のGoogle OAuth同意画面・Sheets APIとの疎通は、CI上で自動化されたテストでは検証できない（実在のGoogleアカウント・OAuthクライアントが必要なため）。`GoogleSheetsProjectService`の変換ロジック・エラーハンドリングは単体テストで担保するが、実際の保存・読み込みが主催者自身のスプレッドシートに対して正しく動作することは、Admin Config Toolのセットアップ手順に沿った手動確認が必要になる。
+- **手動検証が必要な範囲**: 主催者がJSONの内容をGoogleスプレッドシートへ手作業で転記する作業自体（Requirement 15）はアプリの機能ではないため自動テストの対象外であり、`docs/organizer-guide.md`の手順に沿って主催者自身が確認する。参加者向けMap Viewerの読み取り側（Requirement 16）はOAuth等の外部アカウントを必要としないため、E2Eテストで完全に自動検証できる。

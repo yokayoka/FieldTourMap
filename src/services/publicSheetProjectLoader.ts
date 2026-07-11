@@ -20,8 +20,7 @@ function csvUrl(spreadsheetId: string, sheetName: string): string {
  * URLの`project`パラメータで指定されたGoogleスプレッドシートを、認証情報
  * なしで読み取り専用に読み込む（Requirement 16）。スプレッドシートの
  * 「ウェブに公開」機能で得られる公開CSVエンドポイントをfetchするのみで、
- * OAuth・APIキーは一切使わない。GoogleSheetsProjectService（Admin Tool専用、
- * OAuth読み書き）とは独立した、参加者向けMap Viewer専用の実装。
+ * OAuth・APIキーは一切使わない。参加者向けMap Viewer専用の実装。
  */
 export class PublicSheetProjectLoader {
   private readonly fetchFn: typeof fetch;
