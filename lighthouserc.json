@@ -2,11 +2,13 @@
   "ci": {
     "collect": {
       "startServerCommand": "npm run preview -- --port 4173 --strictPort",
-      "startServerReadyPattern": "Local:",
+      "startServerReadyPattern": "Local",
       "url": ["http://localhost:4173/FieldTourMap/"],
       "numberOfRuns": 1,
       "settings": {
-        "chromeFlags": "--headless=new --no-sandbox --disable-gpu"
+        "chromeFlags": "--no-sandbox --disable-gpu --disable-dev-shm-usage",
+        "maxWaitForFcp": 60000,
+        "maxWaitForLoad": 90000
       }
     },
     "assert": {
