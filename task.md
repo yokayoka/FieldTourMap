@@ -29,9 +29,12 @@
   - 完了メモ: `src/types/config.ts`に型定義、`src/services/configValidator.ts`（単体テスト16件）、`src/services/configLoader.ts`（fetchモックによるテスト7件）を実装。全24テスト・lint・型チェック・buildすべて成功。リファクタリング観点で確認済み（重複なし、関数は単一責務）で追加変更不要と判断
   - _Requirements: 10, 4, 4.1, 4.2_
 
-- [ ] 4. 🔴 サンプル設定ファイルの作成
+- [x] 4. ✅️ サンプル設定ファイルの作成
   - `public/config/layers.json`（地理院地図・シームレス地質図・OSM等、最低3種のベースレイヤー含む）
   - `public/config/tours/sample-tour.json`（POI・ルート・メディアリンク・参考論文リンクのサンプルを含む）
+  - 完了メモ: `layers.json`はベースレイヤー3種（地理院地図標準/写真、OSM）+ シームレス地質図をオーバーレイ（opacity 0.6）として定義。`tours/sample-tour.json`にPOI2件（写真リンク付き・動画リンク付き）、参考論文リンク1件、ルート1件を含めた。`tours/index.json`も追加。実ファイルをConfigValidatorで検証する回帰テストを先に作成（7件、Red→Green確認）
+  - 設計判断の記録: requirements.md Req2.1は「地質図」を3種のベースレイヤーの一つと例示していたが、地形図と重ねて比較する用途を優先し、design.mdの方針通りシームレス地質図は半透明オーバーレイとして実装した。ベースレイヤー自体は地理院地図標準/写真・OSMの3種で「3種類以上」の基準は満たしている
+  - 副次対応: `sampleConfig.test.ts`で`node:fs`等を使うため`@types/node`を追加し、`tsconfig.json`の`types`に`"node"`を追加
   - _Requirements: 2, 4, 4.1, 4.2, 10_
 
 - [ ] 5. 🔴 LayerManagerとレイヤーコントロールUIの実装

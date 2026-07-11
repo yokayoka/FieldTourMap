@@ -1,0 +1,52 @@
+{
+  "id": "sample-tour",
+  "title": "サンプル巡検コース",
+  "description": "動作確認用のサンプルツアーです。",
+  "layerIds": ["gsi-std", "gsi-photo", "osm", "aist-geology"],
+  "pois": [
+    {
+      "id": "poi-01",
+      "name": "露頭A（花崗岩貫入部）",
+      "description": "花崗岩の貫入と接触変成の様子が観察できる露頭。",
+      "position": { "lat": 35.681236, "lng": 139.767125 },
+      "media": [
+        {
+          "url": "https://drive.google.com/file/d/xxxxxxxxxxxxxxxxxxxx/view",
+          "caption": "露頭全景写真（2025年撮影）",
+          "type": "photo"
+        }
+      ],
+      "referencePapers": [
+        {
+          "url": "https://doi.org/10.11501/example0001",
+          "citation": "山田太郎ほか (2020)「〇〇地域における花崗岩の貫入年代」地質学雑誌 126巻"
+        }
+      ]
+    },
+    {
+      "id": "poi-02",
+      "name": "露頭B（断層露頭）",
+      "description": "正断層の断層面と条線が観察できる露頭。",
+      "position": { "lat": 35.68255, "lng": 139.76845 },
+      "media": [
+        {
+          "url": "https://www.dropbox.com/s/xxxxxxxxxxxx/fault-outcrop.mp4?dl=0",
+          "caption": "断層面の解説動画（3分）",
+          "type": "video"
+        }
+      ],
+      "referencePapers": []
+    }
+  ],
+  "routes": [
+    {
+      "id": "route-01",
+      "name": "駐車場〜露頭A〜露頭Bルート",
+      "points": [
+        { "lat": 35.68, "lng": 139.766 },
+        { "lat": 35.681236, "lng": 139.767125 },
+        { "lat": 35.68255, "lng": 139.76845 }
+      ]
+    }
+  ]
+}
