@@ -37,10 +37,12 @@
   - 副次対応: `sampleConfig.test.ts`で`node:fs`等を使うため`@types/node`を追加し、`tsconfig.json`の`types`に`"node"`を追加
   - _Requirements: 2, 4, 4.1, 4.2, 10_
 
-- [ ] 5. 🔴 LayerManagerとレイヤーコントロールUIの実装
+- [x] 5. ✅️ LayerManagerとレイヤーコントロールUIの実装
   - ベースレイヤー切替・オーバーレイレイヤーの複数ON/OFFのテスト作成→実装
   - 表示中レイヤー構成のlocalStorage永続化・再読み込み時の復元
   - レイヤー切替UIコンポーネント（片手操作を考慮した配置）
+  - 完了メモ: `LayerManager`は`MapLike`インターフェース越しにLeafletマップへ依存させ、フェイクmap/storageで7件のテストをTDD実施（unknown ID時のthrow、永続化、破損データからのフォールバック含む）。`layerControl.ts`はDOM操作のみの純粋コンポーネントとして5件のテストを実施。`main.ts`で実際のLeaflet地図・`loadLayers()`・`LayerManager`・`createLayerControl`を配線。Playwrightで実ブラウザ動作確認（レイヤー切替、リロード後の状態復元、コンソールエラーなし、スクリーンショットで地理院地図・地質図オーバーレイの表示を確認）
+  - CSSで`.layer-control__button`/`.layer-control__checkbox-label`に44px以上のタップ領域、画面下部固定配置を実装（Requirement 6.2, 6.4）
   - _Requirements: 2, 6_
 
 - [ ] 6. 🔴 GeolocationServiceと現在地表示の実装
