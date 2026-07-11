@@ -4,6 +4,7 @@ import {
   sheetToLayers,
   mergeTourIntoSheets,
   extractTourFromSheets,
+  sheetToTourSummaries,
   type SheetsData,
 } from "./googleSheetsRowMapping";
 import type { LayerDefinition, TourConfig } from "../types/config";
@@ -164,5 +165,22 @@ describe("mergeTourIntoSheets / extractTourFromSheets", () => {
     const noLayerTour: TourConfig = { ...tour, layerIds: [] };
     const merged = mergeTourIntoSheets({}, noLayerTour);
     expect(extractTourFromSheets(merged, "sample-tour")?.layerIds).toEqual([]);
+  });
+});
+
+describe("sheetToTourSummaries", () => {
+  it("returns an {id, title} pair for each tour row", () => {
+    const otherTour: TourConfig = { ...tour, id: "second-tour", title: "第二巡検コース" };
+    const merged = mergeTourIntoSheets(mergeTourIntoSheets({}, tour), otherTour);
+
+    expect(sheetToTourSummaries(merged.Tours ?? [])).toEqual([
+      { id: "sample-tour", title: "サンプル巡検コース" },
+      { id: "second-tour", title: "第二巡検コース" },
+    ]);
+  });
+
+  it("returns an empty array for an empty/header-only sheet", () => {
+    expect(sheetToTourSummaries([])).toEqual([]);
+    expect(sheetToTourSummaries([["tourId", "title"]])).toEqual([]);
   });
 });

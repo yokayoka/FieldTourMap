@@ -184,6 +184,11 @@ export function mergeTourIntoSheets(existing: SheetsData, tour: TourConfig): She
   };
 }
 
+/** `Tours`シートの行から{id, title}一覧を取り出す（`listAvailableTours()`相当）。 */
+export function sheetToTourSummaries(rows: string[][]): { id: string; title: string }[] {
+  return rowsToObjects(rows).map((row) => ({ id: row.tourId, title: row.title }));
+}
+
 export function extractTourFromSheets(sheets: SheetsData, tourId: string): TourConfig | null {
   const toursRow = rowsToObjects(sheets.Tours ?? []).find((row) => row.tourId === tourId);
   if (!toursRow) return null;
