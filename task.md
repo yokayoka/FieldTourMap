@@ -256,6 +256,37 @@ Phase 1完了後、8観点（正誤性3・再利用/簡素化/効率3・altitude
 
 ---
 
-## プロジェクト完了サマリー
+## プロジェクト完了サマリー（Phase 1〜4）
 
 `requirements.md`に定義された16件の要件（Requirement 1〜14、4.1、4.2）はいずれも実装・テストにより裏付けられている。既知の制約（実機未検証、Lighthouse CIのNO_FCP問題、Admin Config Toolの一部編集UI未実装等）はいずれも致命的ではなく、各タスクの完了メモ・SECURITY.md・organizer-guide.md/developer-guide.mdに記録済みである。GitHub Pages本番環境（`https://yokayoka.github.io/FieldTourMap/`）で継続的にCI/CDパイプラインを通じて運用されている。
+
+## Phase 5: Googleスプレッドシート連携（Requirement 15）
+
+Phase 4完了後、ユーザーからの追加要望によりRequirement 15（Googleスプレッドシートによるプロジェクトの保存・読み込み）を追加した。Admin Config Tool専用の機能であり、参加者向けMap Viewerには影響しない。
+
+- [x] 25. ✅️ GoogleSheetsProjectServiceの実装（TDD）
+  - Google Identity Services（GIS）の動的読み込みとOAuth 2.0トークン取得（`authorize`/`isAuthorized`）
+  - `LayerDefinition[]` ⇄ `Layers`シート行の相互変換（往復一致テスト）
+  - `TourConfig`（POI/メディア/参考文献/ルート/ルート頂点）⇄ `Tours`/`POIs`/`Media`/`ReferencePapers`/`Routes`/`RoutePoints`各シート行の相互変換（往復一致テスト、`tourId`によるフィルタ・他ツアー行の非破壊を含む）
+  - Sheets API v4呼び出し（`fetch`ベース、`values.get`/`values.update`等）をDIパターンでフェイクに差し替え可能にし、認可拒否・API失敗・シート形式不正の異常系を含めて単体テスト
+  - 完了メモ: `admin-tool/src/services/googleSheetsRowMapping.ts`（純粋な変換ロジック、ヘッダー名による列対応付けで列順のずれに頑健、10テスト）と`admin-tool/src/services/googleSheetsProjectService.ts`（OAuth・Sheets API呼び出しのオーケストレーション、13テスト）に分割してTDD実装した。`gapi`等の重量級クライアントライブラリは追加せず、GISスクリプトの動的`<script>`読み込み+`fetch`によるSheets API v4直接呼び出しのみで実現し、新規npm依存はゼロ
+  - `saveTour`/`loadTour`は対象ツアーのシート全体を読み込んでから`tourId`でフィルタ・置換し書き戻す設計とし、同一スプレッドシートに複数ツアーが保存されていても他ツアーの行を破壊しないことをテストで確認した（`mergeTourIntoSheets`の他ツアー保持テスト、同一ツアーを再保存した際に重複せず置換されることのテスト含む）
+  - Admin Config Tool専用であることをビルド成果物で確認: `npm run build`後の参加者向けバンドル（`dist/assets/main-*.js`）のファイルサイズが本タスク追加前後で変化しないことを確認し、新規コードが参加者向けMap Viewerのバンドルに混入していないことを裏付けた（Requirement 15.7）
+  - 単体テスト287件→310件（+23）、E2Eテスト44件（変更なし、影響なし）、lint・型チェック・buildすべて成功
+  - _Requirements: 15_
+
+- [ ] 26. 🔴 Admin Config Tool（レイヤー編集）へのGoogleスプレッドシート連携統合
+  - OAuthクライアントID・スプレッドシートIDの入力UI（localStorageへの保存）
+  - 「スプレッドシートに保存」「スプレッドシートから読み込む」ボタンの追加、`AdminLayerListStore`との連携
+  - 成功/失敗のフィードバック表示、失敗時も既存のJSONダウンロード機能に影響を与えないことをテストで確認
+  - _Requirements: 15_
+
+- [ ] 27. 🔴 Admin Config Tool（ツアー編集）へのGoogleスプレッドシート連携統合
+  - Task 26と同様のUIをツアー編集ページに追加し、`AdminTourStore`と連携（現在編集中の`tourId`のみを対象に保存・読み込み）
+  - 複数ツアーを含むスプレッドシートから対象ツアーのみを読み込めることのテスト
+  - _Requirements: 15_
+
+- [ ] 28. 🔴 セットアップドキュメント整備と最終確認
+  - `docs/organizer-guide.md`にGoogle Cloudプロジェクト作成・OAuth同意画面設定（テストユーザー登録）・OAuthクライアントID発行の手順を追記
+  - 実際にGoogle Sheets APIとの疎通を確認できる範囲（単体テスト・UIの手動確認）で最終確認し、実際のOAuth同意画面・スプレッドシート読み書きはユーザー自身による確認が必要である旨を明記
+  - _Requirements: 15_
