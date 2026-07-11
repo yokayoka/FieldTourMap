@@ -218,9 +218,13 @@ Phase 1完了後、8観点（正誤性3・再利用/簡素化/効率3・altitude
   - 単体テスト260件→282件、E2Eテスト41件（変更なし）、lint・型チェック・buildすべて成功
   - _Requirements: 9_
 
-- [ ] 22. 🔴 運用ドキュメント整備
+- [x] 22. ✅️ 運用ドキュメント整備
   - 主催者向けドキュメント（Admin Config Toolの使い方、JSON編集・Git commit/push手順）
   - 開発者向けドキュメント（ローカル開発環境構築、テスト実行、デプロイ手順）
+  - 完了メモ: `docs/organizer-guide.md`（主催者向け）と`docs/developer-guide.md`（開発者向け）を新設し、ほぼ空だった`README.md`をドキュメント一覧+クイックスタートを載せたランディングページに書き換えた
+  - organizer-guide.mdは実際のAdmin Config Toolのソースコード（`admin-tool/src/main.ts`, `tourEditorMain.ts`, `layerEditorForm.ts`）を確認した上で、フォーム項目名・ボタン文言を実装と一致させて記載。レイヤー編集・POI/ルート編集の操作手順に加え、Task 20で追加した複数ツアー機能に対応するため`tours/index.json`への登録手順を明記し、既知の制約（レイヤー選択・ルート頂点編集UI未実装）もTask 14の完了メモと整合させて記載した。Git操作に不慣れな主催者を想定し、コマンド例に加えGitHub Desktop等のGUIツールでも代替できる旨を明記した
+  - developer-guide.mdは`package.json`のスクリプト一覧（lint/tsc/test/test:coverage/test:e2e/build/preview）、`.github/workflows/deploy.yml`の実際のジョブ構成（テスト失敗時にデプロイがブロックされる仕組み、Lighthouse CIが非ブロッキングである理由と既知の制約への言及）、Pages初回セットアップの注意点（Task 2の完了メモに記載された404の既知の落とし穴）を記載した
+  - 本タスクはドキュメント整備が主目的でありアプリケーションコードの変更は行っていないため、既存のテストスイート（単体282件・E2E 41件）に影響はない
   - _Requirements: 9, 11, 12_
 
 - [ ] 23. 🔴 実機クロスブラウザ検証
