@@ -1,15 +1,20 @@
 import "leaflet/dist/leaflet.css";
 import "./style.css";
 import L from "leaflet";
-import { loadLayers } from "./services/configLoader";
+import { loadLayers, loadTour } from "./services/configLoader";
 import { LayerManager } from "./services/layerManager";
 import { createLayerControl } from "./components/layerControl";
 import { GeolocationService, type GeolocationUpdate } from "./services/geolocationService";
 import { createLocationControl } from "./components/locationControl";
+import { PoiRouteOverlay } from "./services/poiRouteOverlay";
+import { createPoiDetailPanel } from "./components/poiDetailPanel";
 
 // 初期表示位置は現在地取得（Requirement 1）が成功するまでの暫定フォールバック。
 const DEFAULT_CENTER: L.LatLngExpression = [35.681236, 139.767125];
 const DEFAULT_ZOOM = 15;
+
+// Phase 1では単一ツアーの読み込みに固定する（複数ツアー切替はTask 20で対応）。
+const DEFAULT_TOUR_ID = "sample-tour";
 
 export function mountApp(root: HTMLElement): void {
   const mapContainer = document.createElement("div");
@@ -74,6 +79,33 @@ function setupLocationTracking(map: L.Map, root: HTMLElement): void {
   });
 }
 
+async function setupPoiOverlay(map: L.Map, root: HTMLElement): Promise<void> {
+  let tour;
+  try {
+    tour = await loadTour(DEFAULT_TOUR_ID);
+  } catch (error) {
+    console.warn(`ツアー "${DEFAULT_TOUR_ID}" の読み込みに失敗しました`, error);
+    return;
+  }
+
+  const detailPanel = createPoiDetailPanel(() => overlay.closePoiDetail());
+  root.appendChild(detailPanel.root);
+
+  const overlay = new PoiRouteOverlay({
+    map,
+    onSelectionChange: (poiId) => {
+      if (poiId === null) {
+        detailPanel.hide();
+        return;
+      }
+      const poi = tour.pois.find((p) => p.id === poiId);
+      if (poi) detailPanel.show(poi);
+    },
+  });
+
+  overlay.renderTour(tour);
+}
+
 export async function initializeMap(root: HTMLElement, mapContainer: HTMLElement): Promise<void> {
   const map = L.map(mapContainer).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
   const layers = await loadLayers();
@@ -82,6 +114,7 @@ export async function initializeMap(root: HTMLElement, mapContainer: HTMLElement
   root.appendChild(layerControl);
 
   setupLocationTracking(map, root);
+  await setupPoiOverlay(map, root);
 }
 
 const appRoot = document.querySelector<HTMLDivElement>("#app");
