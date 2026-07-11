@@ -27,6 +27,28 @@ function buildLargeTour(poiCount: number): TourConfig {
   };
 }
 
+test.describe("通常時の初期表示速度（Requirement 7.1）", () => {
+  // Lighthouse CI（Task 17）は本アプリのページに対してNO_FCPで失敗し
+  // 計測できていない（task.mdのTask 17完了メモ参照）ため、代わりに
+  // Playwrightで実際の公開サンプルツアーを使った通常規模の初期表示時間を
+  // 計測し、Requirement 7.1（3秒以内）の充足を確認する回帰テストとする。
+  test("実際の公開設定（sample-tour）での初期表示が3秒以内に完了する", async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(String(error)));
+
+    const start = Date.now();
+    await page.goto("/");
+    await expect(page.locator(".leaflet-container")).toBeVisible();
+    await expect(page.locator(".leaflet-marker-icon:not(.location-marker)").first()).toBeVisible({
+      timeout: 5000,
+    });
+    const elapsed = Date.now() - start;
+
+    expect(elapsed).toBeLessThan(3000);
+    expect(pageErrors).toEqual([]);
+  });
+});
+
 test.describe("大量POI描画時のパフォーマンス（Requirement 7）", () => {
   test("POI 150件でも初期表示が3秒以内に完了し、地図操作も継続できる", async ({ page }) => {
     const tour = buildLargeTour(150);

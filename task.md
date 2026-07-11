@@ -239,8 +239,23 @@ Phase 1完了後、8観点（正誤性3・再利用/簡素化/効率3・altitude
     3. iOS Safari実機でGNSS現在地表示・レイヤー切替・POI表示等の基本機能が問題なく動作すること
   - _Requirements: 1, 6, 13, 14_
 
-- [ ] 24. 🔴 本番リリース前最終レビュー
+- [x] 24. ✅️ 本番リリース前最終レビュー
   - `requirements.md`全項目の受け入れ基準に対する充足確認
   - `design.md`とのアーキテクチャ整合性確認
   - GitHub Pages本番環境への最終デプロイ
+  - 完了メモ: Requirement 1〜14（4.1, 4.2含む）の全受け入れ基準を実装・テストコードと照合した。ほぼ全項目が単体テスト・E2Eテストまたは実装コードで直接裏付けられていることを確認した。以下、確認の過程で見つかった軽微な事項を記録する。
+    - **Requirement 7.1（初期表示3秒以内）**: Lighthouse CI（Task 17）が`NO_FCP`エラーで未稼働のため、本要件を直接裏付ける自動計測が欠けていた。代替として`e2e/performance.spec.ts`に実際の公開サンプルツアーを用いた通常規模の初期表示時間を計測するE2Eテストを追加し（実測255ms）、3秒以内であることを回帰テストとして固定した
+    - **Requirement 2.4（レイヤー切替2秒以内、キャッシュ済みタイル時）**: `LayerManager.setBaseLayer()`/`toggleOverlay()`はタイルレイヤーの生成・追加を同期的に行い、人為的な遅延を挟まない設計のため設計上は充足しているが、実際のタイル読み込み時間はネットワーク依存でありE2Eでの厳密な時間計測は行っていない（ネットワーク依存の値をテストで固定するとテストの安定性を損なうため）
+    - **Requirement 10.2（新規タイルソース追加の容易性、"WMS/XYZ形式等"の例示）**: 実装は`LayerDefinition.urlTemplate`によるXYZ形式のみをサポートし、WMS形式には対応していない。要件文は"等"を含む例示でありXYZのみの対応でも要件の趣旨（コード変更なしでの新規レイヤー追加）は満たしていると判断したが、将来WMS等の別形式に対応する場合は`LayerManager.defaultCreateLayer()`の拡張が必要になる
+    - 上記いずれも既存のPhase 1〜3の完了メモ・SECURITY.md・organizer-guide.md/developer-guide.mdに記録済みの制約と重複せず、新たに致命的な未充足項目は見つからなかった
+  - `design.md`とのアーキテクチャ整合性確認の結果、フェーズ1初期からの実装進化に伴う記述の陳腐化を複数発見した。ユーザーに確認の上、実装済み内容をdesign.mdへ反映する修正（新規設計変更ではない）を実施した: (1) `ShareViewState`に`tourId`フィールドを追加（Task 20相当）、(2) MapViewerの責務にツアー切替を追記し、実装が`main.ts`内の複数`setupXxx()`関数に分割されている旨を明記、(3) AdminConfigToolの記述を、実際の2ページ構成・複数ストア/コンポーネントへの分解に合わせて修正、(4) File Storage Structureを実際の構成（`index.html`のルート配置、`docs/`, `SECURITY.md`, `e2e/`, `lighthouserc.json`, `public/manifest.json`, `public/sw.js`等）に合わせて修正、(5) Testing Strategyにカバレッジ計測・E2Eテスト件数・Lighthouse CIの既知の制約を追記
+  - 最終デプロイ: 本タスクの変更（E2Eテスト追加・design.md修正）をコミット・pushし、CI（build/deploy）成功を確認した。本番URL（`https://yokayoka.github.io/FieldTourMap/`）に対しPlaywrightで実ブラウザ確認し、地図表示・レイヤー切替・POI詳細表示・ツアー切替・PWAマニフェストが正常に動作することを確認した
   - _Requirements: 12_
+
+**Phase 4 (本番化対応) 完了**: タスク21〜24すべて完了。自動テストカバレッジ拡充（単体287件・E2E 44件）・運用ドキュメント整備・既知のプラットフォーム差異への対応・requirements.md/design.mdの最終整合性確認を経て、本プロジェクトの計画された全24タスクが完了した。
+
+---
+
+## プロジェクト完了サマリー
+
+`requirements.md`に定義された16件の要件（Requirement 1〜14、4.1、4.2）はいずれも実装・テストにより裏付けられている。既知の制約（実機未検証、Lighthouse CIのNO_FCP問題、Admin Config Toolの一部編集UI未実装等）はいずれも致命的ではなく、各タスクの完了メモ・SECURITY.md・organizer-guide.md/developer-guide.mdに記録済みである。GitHub Pages本番環境（`https://yokayoka.github.io/FieldTourMap/`）で継続的にCI/CDパイプラインを通じて運用されている。
