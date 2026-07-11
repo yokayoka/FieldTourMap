@@ -61,3 +61,12 @@ export interface ObservationMemo {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface ShareViewState {
+  lat: number;
+  lng: number;
+  zoom: number;
+  baseLayerId: string;
+  overlayLayerIds: string[];
+  poiId?: string;
+}

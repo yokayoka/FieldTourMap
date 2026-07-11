@@ -302,6 +302,43 @@ body,
   color: #111;
 }
 
+/*
+ * POI詳細パネルやメモパネルなど画面下部を覆うシートが開いていても
+ * 常に操作できるよう、bottom-controlsとは独立した画面上部に配置する
+ * （Requirement 13.2）。z-indexはpoi-detail-panel/memo-panel(1100)より
+ * 高く、致命的エラー時のapp-error-banner(2000)より低くする。
+ */
+.share-control--floating {
+  position: fixed;
+  top: max(8px, env(safe-area-inset-top));
+  right: 8px;
+  z-index: 1150;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.share-control__button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #fff;
+  color: #111;
+  font-size: 14px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+}
+
+.share-control__feedback {
+  font-size: 13px;
+  color: #1a5fb4;
+  background: #fff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+}
+
 /* メモ作成・編集・閲覧用の下部シート（poi-detail-panelと同様の構造） */
 .memo-panel {
   position: fixed;

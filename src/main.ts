@@ -15,6 +15,8 @@ import { createMemoPanel } from "./components/memoPanel";
 import { createMemoControl } from "./components/memoControl";
 import type { LayerDefinition, ObservationMemo } from "./types/config";
 import { downloadTextFile } from "./utils/downloadTextFile";
+import { ShareLinkService } from "./services/shareLinkService";
+import { createShareControl } from "./components/shareControl";
 
 // 初期表示位置は現在地取得（Requirement 1）が成功するまでの暫定フォールバック。
 const DEFAULT_CENTER: L.LatLngExpression = [35.681236, 139.767125];
@@ -162,6 +164,47 @@ function setupPrecacheControl(
   }
 }
 
+function setupShareControl(
+  map: L.Map,
+  layerManager: LayerManager,
+  getOverlay: () => PoiRouteOverlay | null,
+  root: HTMLElement,
+  shareLinkService: ShareLinkService,
+): void {
+  const control = createShareControl({
+    onShare: async () => {
+      const center = map.getCenter();
+      const layerState = layerManager.getActiveLayerState();
+      const poiId = getOverlay()?.getOpenPoiId() ?? undefined;
+
+      const url = shareLinkService.encode({
+        lat: center.lat,
+        lng: center.lng,
+        zoom: map.getZoom(),
+        baseLayerId: layerState.baseLayerId,
+        overlayLayerIds: layerState.overlayLayerIds,
+        ...(poiId ? { poiId } : {}),
+      });
+
+      if (await shareLinkService.shareViaWebShareApi(url)) {
+        return { success: true, message: "共有しました" };
+      }
+      if (await shareLinkService.copyToClipboard(url)) {
+        return { success: true, message: "リンクをコピーしました" };
+      }
+      return {
+        success: false,
+        message: "共有に失敗しました。ブラウザの設定を確認してください。",
+      };
+    },
+  });
+  // POI詳細パネルやメモパネルが画面下部を覆っている間も共有操作を行える
+  // よう、bottom-controlsではなく画面上部に独立して配置する
+  // （Requirement 13.2）。
+  control.root.classList.add("share-control--floating");
+  root.appendChild(control.root);
+}
+
 function createMemoIcon(): L.DivIcon {
   return L.divIcon({
     className: "memo-marker",
@@ -233,13 +276,17 @@ function setupObservationMemos(map: L.Map, root: HTMLElement, bottomControls: HT
   });
 }
 
-async function setupPoiOverlay(map: L.Map, root: HTMLElement): Promise<void> {
+async function setupPoiOverlay(
+  map: L.Map,
+  root: HTMLElement,
+  initialPoiId?: string,
+): Promise<PoiRouteOverlay | null> {
   let tour;
   try {
     tour = await loadTour(DEFAULT_TOUR_ID);
   } catch (error) {
     console.warn(`ツアー "${DEFAULT_TOUR_ID}" の読み込みに失敗しました`, error);
-    return;
+    return null;
   }
 
   const detailPanel = createPoiDetailPanel(() => overlay.closePoiDetail());
@@ -261,16 +308,34 @@ async function setupPoiOverlay(map: L.Map, root: HTMLElement): Promise<void> {
   });
 
   overlay.renderTour(tour);
+
+  // 共有URLにPOI IDが含まれていた場合、そのPOI詳細を自動的に開く
+  // （Requirement 13.2）。
+  if (initialPoiId && overlay.getPoiById(initialPoiId)) {
+    overlay.openPoiDetail(initialPoiId);
+  }
+
+  return overlay;
 }
 
 export async function initializeMap(root: HTMLElement, mapContainer: HTMLElement): Promise<void> {
+  // 共有URL（Requirement 13）にビュー状態が含まれていれば復元する。
+  // 不正・破損したURLの場合はdecode()がnullを返し、通常の初期表示に
+  // フォールバックする（Requirement 13.7）。
+  const shareLinkService = new ShareLinkService();
+  const sharedState = shareLinkService.decode(location.href);
+
   // タイルキャッシュの登録は地図表示をブロックしない（Requirement 3）。
   const offlineCacheService = new OfflineCacheService({
     swUrl: `${import.meta.env.BASE_URL}sw.js`,
   });
   void offlineCacheService.register();
 
-  const map = L.map(mapContainer).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+  const initialCenter: L.LatLngExpression = sharedState
+    ? [sharedState.lat, sharedState.lng]
+    : DEFAULT_CENTER;
+  const initialZoom = sharedState?.zoom ?? DEFAULT_ZOOM;
+  const map = L.map(mapContainer).setView(initialCenter, initialZoom);
 
   // 現在地ボタンとレイヤーパネルは同じ画面下部の親指可動域にまとめる
   // （Requirement 6.2）。location-controlを先に追加し、上側に表示する。
@@ -282,12 +347,31 @@ export async function initializeMap(root: HTMLElement, mapContainer: HTMLElement
 
   const layers = await loadLayers();
   const layerManager = new LayerManager({ map, layers, storage: window.localStorage });
+
+  // 共有URLで指定されたレイヤー構成を適用する。存在しないレイヤーIDは
+  // 無視し、通常のデフォルト/永続化済み状態のまま継続する
+  // （Requirement 13.4, 13.7）。
+  if (sharedState) {
+    const validLayerIds = new Set(layers.map((layer) => layer.id));
+    if (validLayerIds.has(sharedState.baseLayerId)) {
+      layerManager.setBaseLayer(sharedState.baseLayerId);
+    }
+    layers
+      .filter((layer) => layer.type === "overlay")
+      .forEach((layer) => {
+        layerManager.toggleOverlay(layer.id, sharedState.overlayLayerIds.includes(layer.id));
+      });
+  }
+
   const layerControl = createLayerControl(layers, layerManager);
   bottomControls.appendChild(layerControl);
   setupPrecacheControl(map, layerManager, layers, layerControl, offlineCacheService);
   setupObservationMemos(map, root, bottomControls);
 
-  await setupPoiOverlay(map, root);
+  let poiOverlay: PoiRouteOverlay | null = null;
+  setupShareControl(map, layerManager, () => poiOverlay, root, shareLinkService);
+
+  poiOverlay = await setupPoiOverlay(map, root, sharedState?.poiId);
 }
 
 const appRoot = document.querySelector<HTMLDivElement>("#app");
