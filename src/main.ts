@@ -68,10 +68,19 @@ function createLocationIcon(heading: number | null): L.DivIcon {
   });
 }
 
-function setupLocationTracking(map: L.Map, bottomControls: HTMLElement): void {
+export interface LocationTrackingHandle {
+  /** メモ・Googleマップリンク等の地点配置モード中、GPS追従による地図の
+   *  再センタリングを一時停止する。ユーザーが狙った地点をタップしようと
+   *  している最中に地図が動いてしまうと操作できなくなるため。 */
+  suspendFollow(): void;
+  resumeFollow(): void;
+}
+
+function setupLocationTracking(map: L.Map, bottomControls: HTMLElement): LocationTrackingHandle {
   const geolocationService = new GeolocationService();
   let marker: L.Marker | null = null;
   let accuracyCircle: L.Circle | null = null;
+  let followSuspended = false;
 
   const locationControl = createLocationControl({
     onToggleFollow: (enabled) => {
@@ -108,7 +117,7 @@ function setupLocationTracking(map: L.Map, bottomControls: HTMLElement): void {
       accuracyCircle.setRadius(update.accuracy);
     }
 
-    if (geolocationService.isFollowModeEnabled()) {
+    if (geolocationService.isFollowModeEnabled() && !followSuspended) {
       map.setView(latlng, map.getZoom());
     }
   };
@@ -116,6 +125,15 @@ function setupLocationTracking(map: L.Map, bottomControls: HTMLElement): void {
   geolocationService.startWatching(handleUpdate, (message) => {
     locationControl.showError(message);
   });
+
+  return {
+    suspendFollow: () => {
+      followSuspended = true;
+    },
+    resumeFollow: () => {
+      followSuspended = false;
+    },
+  };
 }
 
 // 現在のズームから何段階分ズームインした範囲まで事前ダウンロードするか
@@ -247,6 +265,7 @@ function setupGoogleMapsLinkFeature(
   root: HTMLElement,
   bottomControls: HTMLElement,
   fallbackPanel: LinkFallbackPanel,
+  locationTracking: LocationTrackingHandle,
 ): { requestLink: (point: LatLng) => Promise<void> } {
   const googleMapsLinkService = new GoogleMapsLinkService();
 
@@ -266,6 +285,11 @@ function setupGoogleMapsLinkFeature(
   const control = createGoogleMapsLinkControl({
     onTogglePlacement: (active) => {
       placementActive = active;
+      // 配置モード中はGPS追従による地図の再センタリングを止める
+      // （ユーザーが狙った地点をタップしようとしている最中に地図が動くと
+      // 操作できなくなるため）。
+      if (active) locationTracking.suspendFollow();
+      else locationTracking.resumeFollow();
     },
   });
   bottomControls.appendChild(control.root);
@@ -274,6 +298,7 @@ function setupGoogleMapsLinkFeature(
     if (!placementActive) return;
     placementActive = false;
     control.setActive(false);
+    locationTracking.resumeFollow();
     void requestLink({ lat: event.latlng.lat, lng: event.latlng.lng });
   });
 
@@ -294,6 +319,7 @@ function setupObservationMemos(
   root: HTMLElement,
   bottomControls: HTMLElement,
   storageKeySuffix: string,
+  locationTracking: LocationTrackingHandle,
 ): void {
   const store = new ObservationMemoStore({ storageKey: MEMO_STORAGE_KEY + storageKeySuffix });
   let memoMarkers: L.Marker[] = [];
@@ -335,6 +361,11 @@ function setupObservationMemos(
   const memoControl = createMemoControl({
     onTogglePlacement: (active) => {
       placementActive = active;
+      // 配置モード中はGPS追従による地図の再センタリングを止める
+      // （ユーザーが狙った地点をタップしようとしている最中に地図が動くと
+      // 操作できなくなるため）。
+      if (active) locationTracking.suspendFollow();
+      else locationTracking.resumeFollow();
     },
     onExportCsv: () => downloadTextFile("observation-memos.csv", store.exportAsCsv(), "text/csv"),
     onExportGeoJson: () =>
@@ -352,6 +383,7 @@ function setupObservationMemos(
     if (!placementActive) return;
     placementActive = false;
     memoControl.setPlacementActive(false);
+    locationTracking.resumeFollow();
     memoPanel.showCreateForm({ lat: event.latlng.lat, lng: event.latlng.lng });
   });
 }
@@ -569,7 +601,7 @@ export async function initializeMap(
   topControls.className = "top-controls";
   root.appendChild(topControls);
 
-  setupLocationTracking(map, bottomControls);
+  const locationTracking = setupLocationTracking(map, bottomControls);
 
   // projectIdが指定されている場合は認証なしの公開スプレッドシート読み込み
   // （Requirement 16）へ、指定されない場合は従来通り静的JSON設定ファイルへ
@@ -584,14 +616,20 @@ export async function initializeMap(
   const layerControl = createLayerControl(layers, layerManager);
   bottomControls.appendChild(layerControl.root);
   setupPrecacheControl(map, layerManager, layers, layerControl.root, offlineCacheService);
-  setupObservationMemos(map, root, bottomControls, storageKeySuffix);
+  setupObservationMemos(map, root, bottomControls, storageKeySuffix, locationTracking);
 
   // クリップボードAPI等が使えない/失敗した環境向けの手動コピー用UI
   // （Requirement 14.6）。共有機能・Googleマップリンク取得機能で共用する。
   const fallbackPanel = createLinkFallbackPanel({ onClose: () => {} });
   root.appendChild(fallbackPanel.root);
 
-  const googleMapsLink = setupGoogleMapsLinkFeature(map, root, bottomControls, fallbackPanel);
+  const googleMapsLink = setupGoogleMapsLinkFeature(
+    map,
+    root,
+    bottomControls,
+    fallbackPanel,
+    locationTracking,
+  );
 
   // ツアー選択・POI/ルート描画・（提案としての）レイヤー構成の切替
   // （Requirement 20）。共有URLにツアーID・明示的なレイヤー構成が含まれて

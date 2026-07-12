@@ -86,3 +86,40 @@ test.describe("観察メモ機能（Requirement 5）", () => {
     expect(geoJsonDownload.suggestedFilename()).toBe("observation-memos.geojson");
   });
 });
+
+test.describe("観察メモ機能: 配置モード中のGPS追従抑制（Requirement 5, 1.5）", () => {
+  test.use({
+    permissions: ["geolocation"],
+    geolocation: { latitude: 35.6895, longitude: 139.6917, accuracy: 15 },
+  });
+
+  test("メモ配置モード中にGPS位置が更新されても、追従モードによる地図の再センタリングは行われない", async ({
+    page,
+    context,
+  }) => {
+    await page.goto("/");
+    await expect(page.locator(".location-marker")).toBeVisible();
+    // 追従モードは既定でON（e2e/geolocation.spec.tsで確認済み）。
+    await expect(page.locator(".location-control__button")).toHaveClass(
+      /location-control__button--active/,
+    );
+
+    const poiMarker = page.locator(".leaflet-marker-icon:not(.location-marker)").first();
+    await expect(poiMarker).toBeVisible();
+    const beforeBox = await poiMarker.boundingBox();
+    expect(beforeBox).not.toBeNull();
+
+    await page.locator(".memo-control__toggle").click();
+
+    // メモ配置モード中に、大きく離れた新しいGPS位置（札幌付近）を通知する。
+    // 追従モードが働いていれば地図がそこへ再センタリングされ、他のマーカー
+    // の画面上の位置も大きくずれるはずである。
+    await context.setGeolocation({ latitude: 43.0, longitude: 141.3, accuracy: 15 });
+    await page.waitForTimeout(300);
+
+    const afterBox = await poiMarker.boundingBox();
+    expect(afterBox).not.toBeNull();
+    expect(Math.abs(afterBox!.x - beforeBox!.x)).toBeLessThan(2);
+    expect(Math.abs(afterBox!.y - beforeBox!.y)).toBeLessThan(2);
+  });
+});
