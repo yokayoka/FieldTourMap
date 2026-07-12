@@ -55,6 +55,15 @@ body,
   overflow-y: auto;
 }
 
+/* PC等の広い画面では、モバイルの片手操作用の余白（8px）は不要なため、
+   画面最下部に密着させる。セーフエリア対応は引き続き必要な端末のみに
+   適用されるため、moduleごと上書きしても問題ない。 */
+@media (min-width: 768px) {
+  .bottom-controls {
+    bottom: env(safe-area-inset-bottom, 0);
+  }
+}
+
 .layer-control {
   align-self: stretch;
   display: flex;

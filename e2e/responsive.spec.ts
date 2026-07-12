@@ -36,4 +36,34 @@ test.describe("レスポンシブレイアウト（Requirement 6）", () => {
     );
     expect(overlap).toBe(false);
   });
+
+  test("モバイル幅では片手操作用の余白（8px程度）が画面最下部との間に保たれる", async ({ page }) => {
+    await page.goto("/");
+
+    const viewport = page.viewportSize();
+    const rect = await page.locator(".bottom-controls").boundingBox();
+    expect(viewport).not.toBeNull();
+    expect(rect).not.toBeNull();
+
+    const gap = viewport!.height - (rect!.y + rect!.height);
+    expect(gap).toBeGreaterThanOrEqual(6);
+  });
+});
+
+test.describe("レスポンシブレイアウト（Requirement 6）: PC幅での操作パネル配置", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test("PC幅（768px以上）ではレイヤー選択パネルが画面最下部に密着して表示される", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    const viewport = page.viewportSize();
+    const rect = await page.locator(".bottom-controls").boundingBox();
+    expect(viewport).not.toBeNull();
+    expect(rect).not.toBeNull();
+
+    const gap = viewport!.height - (rect!.y + rect!.height);
+    expect(gap).toBeLessThanOrEqual(1);
+  });
 });
