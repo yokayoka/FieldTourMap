@@ -28,6 +28,17 @@ dist-ssr
 # Claude Code local harness state
 .claude/scheduled_tasks.lock
 
+# Claudeによる開発プロセスで使用する内部ドキュメント（コード・利用者向け
+# ガイドとは別に、開発時のみ参照する要件・設計・進捗管理文書）。
+# 公開リポジトリには含めない。
+CLAUDE.md
+requirements.md
+requirements_gen.md
+design.md
+design_gen.md
+task.md
+task_gen.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
