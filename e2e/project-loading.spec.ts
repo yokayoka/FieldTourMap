@@ -28,10 +28,12 @@ const projectTour: TourConfig = {
       id: "poi-external-01",
       name: "第三者POI",
       description: "第三者が作成した観察地点。",
-      // 初期読み込み時（明示的なツアー切替を伴わない）は地図の再センタリング
-      // が行われないため、既定の初期表示位置（DEFAULT_CENTER）と同じ座標に
-      // 置き、ビューポート外でクリックできなくなることを避ける。
-      position: { lat: 35.681236, lng: 139.767125 },
+      // 既定の初期表示位置（DEFAULT_CENTER、東京付近）から意図的に遠く離れた
+      // 座標にする。`?project=`読み込み時は初期表示でもこのPOI範囲へ
+      // 自動的に再センタリングされる（centerOnPois）ため、ここでマーカーを
+      // クリックできることが、その再センタリングが実際に効いていることの
+      // 検証になる。
+      position: { lat: 37.4, lng: 136.9 },
       media: [],
       referencePapers: [],
     },

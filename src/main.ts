@@ -365,6 +365,7 @@ interface TourSwitchingInitialState {
   tourId?: string;
   poiId?: string;
   layerOverride?: { baseLayerId: string; overlayLayerIds: string[] };
+  hasSharedView?: boolean;
 }
 
 /**
@@ -436,7 +437,7 @@ async function setupTourSwitching(
 
   async function selectTour(
     tourId: string,
-    options: { poiId?: string; isExplicitSwitch?: boolean } = {},
+    options: { poiId?: string; isExplicitSwitch?: boolean; centerOnPois?: boolean } = {},
   ): Promise<void> {
     let tour;
     try {
@@ -467,13 +468,19 @@ async function setupTourSwitching(
           layerManager.toggleOverlay(layer.id, tour.layerIds.includes(layer.id));
         });
       layerControl.refresh();
+    }
 
-      if (tour.pois.length > 0) {
-        const bounds = L.latLngBounds(
-          tour.pois.map((poi): L.LatLngTuple => [poi.position.lat, poi.position.lng]),
-        );
-        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 17 });
-      }
+    // 地図の再センタリングは、明示的なツアー切替時（Requirement 20）に加え、
+    // 初期読み込み時でも共有URLによる明示的なビュー指定が無い場合は行う
+    // （centerOnPois）。DEFAULT_CENTERは既定サンプルの位置に固定されており、
+    // `?project=`で読み込んだ第三者プロジェクトのPOIが遠方（例: 能登半島）
+    // にある場合、再センタリングしないと常に無関係な地点が表示され続け、
+    // ユーザーが不具合と誤認する原因になっていた。
+    if ((options.isExplicitSwitch || options.centerOnPois) && tour.pois.length > 0) {
+      const bounds = L.latLngBounds(
+        tour.pois.map((poi): L.LatLngTuple => [poi.position.lat, poi.position.lng]),
+      );
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 17 });
     }
 
     if (options.poiId && overlay.getPoiById(options.poiId)) {
@@ -491,7 +498,15 @@ async function setupTourSwitching(
     (isKnownTour(persistedTourId) ? persistedTourId : undefined) ??
     availableTours[0].id;
 
-  await selectTour(initialTourId, { poiId: initial.poiId });
+  // 初期読み込み時にPOI範囲へ再センタリングするのは、`?project=`で読み込んだ
+  // 第三者プロジェクト（DEFAULT_CENTERが無関係な地点になりうる）かつ、共有URL
+  // による明示的なビュー指定が無い場合に限る。既定の静的サンプルはDEFAULT_
+  // CENTER付近に置かれている前提のため、この対象からは除外し既存の見た目を
+  // 変えない。
+  await selectTour(initialTourId, {
+    poiId: initial.poiId,
+    centerOnPois: !initial.hasSharedView && projectId !== undefined,
+  });
 
   // 共有URLに明示的なレイヤー構成が含まれていた場合は、ツアーの提案より
   // 優先して適用する（Requirement 13.4, 13.7）。
@@ -595,6 +610,7 @@ export async function initializeMap(
       layerOverride: sharedState
         ? { baseLayerId: sharedState.baseLayerId, overlayLayerIds: sharedState.overlayLayerIds }
         : undefined,
+      hasSharedView: sharedState !== null,
     },
     projectId,
   );
